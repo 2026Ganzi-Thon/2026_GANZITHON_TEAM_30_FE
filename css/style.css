@@ -516,11 +516,11 @@ main:has(#home:not([hidden])) {
 .info-card .close {
   position: absolute;
   right: clamp(15px, 1.8vw, 26px);
-  top: 23px;
+  top: 14px;
   display: grid;
   place-items: center;
-  width: 42px;
-  height: 42px;
+  width: 36px;
+  height: 36px;
   padding: 0;
   font-size: 20px;
   font-weight: 400;
@@ -666,12 +666,48 @@ main:has(#home:not([hidden])) {
 }
 
 /* Center the product mark on every onboarding view. */
-nav{position:relative}
-.site-brand{position:absolute;left:50%;transform:translateX(-50%);font-size:clamp(22px,2.2vw,30px);font-weight:900;letter-spacing:.08em}
-#account{margin-left:auto}
-.auth-tabs{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin:4px 0 22px;padding:4px;border-radius:999px;background:#f0f3ed}
-.auth-tabs button{padding:8px 12px;background:transparent;color:#49675b}
-.auth-tabs button[aria-selected="true"]{background:#3e6555;color:#fff;box-shadow:0 2px 7px #263f3530}
-#loginForm{display:grid;gap:10px}
-#loginForm h2{margin-bottom:8px}
-#loginForm .status{min-height:20px;margin:0;color:#9a3f32}
+nav {
+  position: relative;
+}
+.site-brand {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: clamp(22px, 2.2vw, 30px);
+  font-weight: 900;
+  letter-spacing: 0.08em;
+}
+#account {
+  margin-left: auto;
+}
+.auth-tabs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 7px;
+  margin: 4px 0 22px;
+  padding: 4px;
+  border-radius: 999px;
+  background: #f0f3ed;
+}
+.auth-tabs button {
+  padding: 8px 12px;
+  background: transparent;
+  color: #49675b;
+}
+.auth-tabs button[aria-selected="true"] {
+  background: #3e6555;
+  color: #fff;
+  box-shadow: 0 2px 7px #263f3530;
+}
+#loginForm {
+  display: grid;
+  gap: 10px;
+}
+#loginForm h2 {
+  margin-bottom: 8px;
+}
+#loginForm .status {
+  min-height: 20px;
+  margin: 0;
+  color: #9a3f32;
+}
