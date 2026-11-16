@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>ON-DO 직무섬</title><link rel="stylesheet" href="css/village.css"><script defer src="js/review.js"></script><script defer src="js/village.js"></script>
+</head>
+<body>
+<main class="village">
+<div id="map" class="map" aria-label="직무섬 지도"><div id="world" class="world"><img id="land" src="assets/village/village-day.webp" alt=""><div id="markers"></div></div></div>
+<header class="identity">
+<div class="glass title"><h1 id="villageName">직무섬</h1><small id="people" class="island-counts" title="체험 모드 예시 수치"><span>총 이웃: 100</span><span>접속 중: 10</span></small></div>
+<div id="zoomIdentity" class="glass zoom-identity" hidden><time id="zoomTime"></time><strong id="zoomVillageName"></strong><small class="island-counts" title="체험 모드 예시 수치"><span>총 이웃: 100</span><span>접속 중: 10</span></small></div>
+<button id="profile" class="profile" aria-expanded="false"><img id="avatar" alt=""><span><strong id="myName"></strong><small>내 프로필</small></span><b id="badge"></b><i aria-hidden="true">⌄</i></button>
+<section id="personal" class="paper personal" hidden aria-label="내 프로필 메뉴"></section>
+</header>
+<div class="search-area">
+<p id="zoomGuide" class="glass zoom-guide" role="status" hidden><span aria-hidden="true">↔ ↕</span> 지도를 움직이거나 오른쪽 고민을 눌러보세요</p>
+<form id="search" class="glass search">
+<label for="query">✦ 내 고민과 닮은 이야기 찾기</label>
+<div class="row"><input id="query" type="search" aria-controls="searchFilters" placeholder="내 이야기를 공개하지 않아도 비슷한 경험을 읽을 수 있어요."><button>찾아보기</button></div>
+<div id="searchFilters" hidden>
+<fieldset class="search-filters">
+<legend>필터</legend>
+<p id="comfortFilterLabel">받고 싶은 위로</p>
+<div class="comfort-filter-options" role="group" aria-labelledby="comfortFilterLabel">
+<button type="button" data-way="" aria-pressed="true">전체</button>
+<button type="button" data-way="0" aria-pressed="false">공감해주세요</button>
+<button type="button" data-way="1" aria-pressed="false">경험을 나눠주세요</button>
+<button type="button" data-way="2" aria-pressed="false">의견을 들려주세요</button>
+</div></fieldset></div>
+</form>
+</div>
+<details id="themePicker" class="theme-picker">
+<summary id="currentTheme" aria-label="배경 시간대 선택"></summary>
+<div id="themes" class="glass themes" role="group" aria-label="지도 시간대"></div>
+</details>
+<aside class="glass neighbors">
+<button id="feedToggle" type="button" aria-expanded="false" aria-controls="feedPanel">
+<span><strong>이웃의 마음</strong><small>지도를 찾지 않아도, 여기서 바로 만나요</small></span><span id="count" aria-live="polite"></span><span class="feed-chevron" aria-hidden="true">⌄</span>
+</button>
+<div id="feedPanel" hidden><button id="reset" class="soft" hidden>초기화</button><div id="feed"></div></div>
+</aside>
+<div class="glass zoom-tools" role="group" aria-label="지도 확대 및 축소"><button id="zoomOut" aria-label="지도 축소">−</button><button id="zoomReset" aria-label="지도 배율 초기화">100%</button><button id="zoomIn" aria-label="지도 확대">+</button></div>
+<button id="compose" class="compose">고민 나누기</button>
+<output id="notice" class="notice" aria-live="polite" hidden></output>
+</main>
+<dialog id="editor" class="paper" aria-labelledby="editorTitle">
+<form id="postForm">
+<div class="between"><h2 id="editorTitle">어떤 고민을 나누고 싶나요?</h2><button type="button" class="soft" data-close="editor">닫기</button></div>
+<p>가장 가까운 고민 분야를 선택해 주세요.</p>
+<div id="categories" class="categories" role="group" aria-label="고민 분야"></div>
+<p id="topicSelection" class="topic-selection" aria-live="polite"></p>
+<div class="editor-label"><label for="postTitle">제목</label><small>필수 · 40자 이내</small></div>
+<div class="title-entry"><input id="postTitle" required maxlength="40" placeholder="고민을 한 문장으로 표현해 주세요"><small id="titleCount">0 / 40</small></div>
+<p class="field-hint">읽는 사람이 상황을 바로 알 수 있도록, 겪고 있는 일을 한 문장으로 적어주세요.</p>
+<div class="editor-label"><label for="body">편하게 고민을 적어주세요.</label><small>필수 · 1,000자 이내</small></div><textarea id="body" required maxlength="1000" rows="5" placeholder="오늘 있었던 일과 마음을 적어보세요.&#10;&#10;회사명과 실명은 빼고 적어주세요."></textarea>
+<fieldset><legend>받고 싶은 위로</legend><div id="comfort" class="row pills"></div></fieldset>
+
+<label id="yearsVisibility" class="toggle privacy"><input type="checkbox" id="shareYears" checked> 연차 정보 공개 <small id="yearsPreview"></small></label>
+<div class="editor-options"><p class="field-hint years-hint">체크를 풀면 연차 없이 익명으로 올라가요.</p><label class="toggle"><input type="checkbox" id="privatePost"> 나만보기</label></div>
+<p class="review-note">게시 전 개인정보와 공격적인 표현을 점검하고, 수정이 필요한 부분을 제안해요.</p>
+<button class="wide">마음 내려놓기</button>
+</form>
+</dialog>
+<dialog id="reviewDialog" class="paper" aria-labelledby="reviewTitle">
+<div class="review-layout">
+<section class="review-main">
+<div class="between"><h2 id="reviewTitle">게시 전, AI가 한 번 더 살펴봤어요</h2><button id="closeReview" class="soft" type="button" aria-label="점검 닫고 작성 화면으로 돌아가기">×</button></div>
+<p id="reviewStatus" role="status"></p>
+<div id="draftPreview" class="draft-preview"></div>
+<p class="review-note">제목과 본문을 여기서 수정하면 점검 결과가 바로 갱신돼요.</p>
+<button id="publishPost" class="wide" type="button" disabled>마음 내려놓기</button>
+</section>
+<aside class="review-side">
+<section>
+<div id="resultPanel">
+<header class="review-panel-heading"><h3 tabindex="-1" id="resultHeading">⬟ AI 점검 결과</h3><p id="reviewResultSummary" class="review-summary"></p></header>
+<div id="reviewResults"></div>
+<p class="review-panel-footer">자해나 극단적 선택을 암시하는 표현이 감지되면 상담 안내를 함께 보여드려요.</p>
+</div>
+<div id="suggestionPanel" hidden>
+<header class="review-panel-heading"><div class="between"><h3>✧ AI 수정 제안</h3><button type="button" id="showResults" class="soft">점검 결과</button></div><p id="reviewSuggestionSummary" class="review-summary"></p></header>
+<div id="reviewSuggestions"></div>
+<p class="review-panel-footer">제안은 적용한 뒤 본문에서 확인할 수 있어요.</p>
+</div>
+</section>
+</aside>
+</div>
+</dialog>
+<dialog id="detail" class="paper" aria-label="고민 상세"><div id="detailBody"></div></dialog>
+<dialog id="deleteDialog" class="paper small" aria-labelledby="deleteTitle">
+<form method="dialog"><h2 id="deleteTitle">이 고민글을 삭제할까요?</h2><p>삭제하면 다시 볼 수 없어요.</p><div class="row"><button value="cancel" class="soft">취소</button><button value="delete" class="danger">삭제하기</button></div></form>
+</dialog>
+</body>
+</html>
