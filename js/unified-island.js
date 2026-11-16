@@ -169,6 +169,7 @@ let searchText = "",
   editing = null,
   deleting = null,
   toastTimer;
+let themeSwapTimer, themeTransitionTimer;
 
 function toast(message) {
   el("notice").textContent = message;
@@ -177,6 +178,33 @@ function toast(message) {
   toastTimer = setTimeout(() => {
     el("notice").hidden = true;
   }, 2400);
+}
+function changeTheme(nextTheme) {
+  if (nextTheme === state.theme) return;
+  if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+    state.theme = nextTheme;
+    save();
+    renderTheme();
+    return;
+  }
+
+  const map = el("map");
+  const nextImage = new Image();
+  nextImage.src = `assets/village/village-${nextTheme}.webp`;
+  clearTimeout(themeSwapTimer);
+  clearTimeout(themeTransitionTimer);
+  map.classList.remove("theme-transitioning");
+  void map.offsetWidth;
+  map.classList.add("theme-transitioning");
+
+  themeSwapTimer = setTimeout(() => {
+    state.theme = nextTheme;
+    save();
+    renderTheme();
+  }, 360);
+  themeTransitionTimer = setTimeout(() => {
+    map.classList.remove("theme-transitioning");
+  }, 900);
 }
 function renderTheme() {
   const [, name] = themes.find(([id]) => id === state.theme) ?? themes[2];
@@ -796,9 +824,7 @@ if (unifiedProfile) {
       delete: remove,
     } = button.dataset;
     if (theme) {
-      state.theme = theme;
-      save();
-      renderTheme();
+      changeTheme(theme);
       el("themePicker").open = false;
       el("currentTheme").focus();
     }
