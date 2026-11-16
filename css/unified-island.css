@@ -398,3 +398,7 @@ dialog .categories{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));al
 .theme-picker .themes button img,.theme-picker .themes button[data-theme] img{position:absolute;inset:auto;left:50%;top:50%;display:block;width:64%!important;height:64%!important;max-width:64%;max-height:64%;margin:0;object-fit:contain;object-position:center;transform:translate(-50%,-50%)!important}
 .theme-picker summary{overflow:hidden}
 .theme-picker summary img{position:absolute;inset:auto;left:50%;top:50%;display:block;width:64%!important;height:64%!important;max-width:64%;max-height:64%;margin:0;object-fit:contain;object-position:center;transform:translate(-50%,-50%)!important}
+.theme-picker .themes button[data-theme=dawn] img{width:72%!important;height:72%!important;max-width:72%;max-height:72%}
+.theme-picker .themes button[data-theme=day] img,.theme-picker .themes button[data-theme=sunset] img{transform:translate(-50%,-34%)!important}
+.theme-picker:has(.themes [data-theme=dawn][aria-pressed=true]) summary img{width:72%!important;height:72%!important;max-width:72%;max-height:72%}
+.theme-picker:has(.themes [data-theme=day][aria-pressed=true]) summary img,.theme-picker:has(.themes [data-theme=sunset][aria-pressed=true]) summary img{transform:translate(-50%,-34%)!important}
