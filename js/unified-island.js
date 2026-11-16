@@ -95,7 +95,7 @@ function renderMarkers() {
     const y = clusterPoint.y + Math.sin(angle)*radius*1.15;
     const isNew = p.fresh || p.time === '방금';
     return `<div class="marker author-pin" style="left:${x}%;top:${y}%">
-      <button class="worry-tag${isNew ? ' is-new' : ''}" data-post="${p.id}" aria-label="${escapeText(p.nick)}의 고민${isNew ? ' · 새 고민' : ''}">고민</button>
+      <button class="worry-tag${isNew ? ' is-new' : ''}" data-post="${p.id}" aria-label="${escapeText(p.nick)}의 고민${isNew ? ' · 새 고민' : ''}">● 고민</button>
       <img src="${img(p.animal)}" alt="${escapeText(p.nick)}의 캐릭터">
       <span class="author-name">${escapeText(p.nick)}</span>
     </div>`;
