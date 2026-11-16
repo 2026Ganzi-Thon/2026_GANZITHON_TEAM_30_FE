@@ -1,5 +1,6 @@
 /* 메인 선택 화면 전용 상태. 팀 로그인 화면의 ondo-profile 값은 읽기만 합니다. */
-const islandSelectProfile = JSON.parse(localStorage.getItem('ondo-profile') || 'null') || { job: '직무' };
+const islandSelectStoredProfile = JSON.parse(localStorage.getItem('ondo-profile') || 'null');
+const islandSelectProfile = islandSelectStoredProfile || { job: '개발', nick: '게스트', animal: 0, years: '' };
 const islandSelectItems = [
   { kind: 'unified', name: '통합섬', path: 'unified-island.html' },
   { kind: 'job', name: `${islandSelectProfile.job}섬`, path: 'village.html' },
@@ -33,10 +34,18 @@ function islandSelectShowPreview(item) {
   islandSelectTitle.textContent = '오늘의 고민은 무엇인가요?';
   islandSelectSubtitle.textContent = islandSelectPreviewMessage(item);
   islandSelectCard.innerHTML = `
+    <button class="island-select-back" id="island-select-back">‹ 섬 선택으로 돌아가기</button>
     <img class="island-select-preview-art" src="${islandSelectArt(item)}" alt="${item.name}">
     <button class="island-select-browse" id="island-select-browse">고민 둘러보기</button>
   `;
-  document.getElementById('island-select-browse').onclick = () => location.assign(item.path);
+  document.getElementById('island-select-back').onclick = islandSelectRender;
+  document.getElementById('island-select-browse').onclick = () => {
+    if (item.kind === 'job') {
+      if (!islandSelectStoredProfile) localStorage.setItem('ondo-profile', JSON.stringify(islandSelectProfile));
+      sessionStorage.setItem('ondo-session', '1');
+    }
+    location.assign(item.path);
+  };
 }
 
 function islandSelectRender() {

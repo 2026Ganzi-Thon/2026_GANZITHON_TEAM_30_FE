@@ -246,30 +246,62 @@ body {
   height: 32px;
   background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 125 32'%3E%3Cpath d='M2 19 Q17 7 32 19 T62 19 T92 19 T122 19' fill='none' stroke='%23efffff' stroke-opacity='.58' stroke-width='4' stroke-linecap='round'/%3E%3C/svg%3E")
     center/contain no-repeat;
+  opacity: 0.78;
+  animation: wave-drift 7s ease-in-out infinite;
+}
+.island-wave::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: inherit;
+  opacity: 0.34;
+  transform: translate(24px, 14px) scale(0.72);
 }
 .wave-a {
   top: 19%;
   left: 7%;
+  width: 165px;
 }
 .wave-b {
   top: 18%;
   right: 8%;
+  width: 185px;
+  animation-delay: -2.3s;
 }
 .wave-c {
   top: 39%;
   left: 10%;
+  width: 145px;
+  animation-delay: -4.1s;
 }
 .wave-d {
   top: 48%;
   right: 11%;
+  width: 170px;
+  animation-delay: -1.2s;
 }
 .wave-e {
   top: 69%;
   left: 8%;
+  width: 190px;
+  animation-delay: -5.4s;
 }
 .wave-f {
   top: 75%;
   right: 14%;
+  width: 150px;
+  animation-delay: -3.2s;
+}
+@keyframes wave-drift {
+  0%,
+  100% {
+    transform: translateX(0) scale(1);
+    opacity: 0.65;
+  }
+  50% {
+    transform: translateX(14px) scale(1.06);
+    opacity: 0.9;
+  }
 }
 @keyframes island-float {
   0%,
@@ -428,16 +460,31 @@ body {
   z-index: 7;
   left: 50%;
   top: 73%;
-  width: 270px;
-  padding: 14px 20px;
+  width: 340px;
+  padding: 18px 24px;
   border: 0;
   border-radius: 99px;
   background: #f9d98e;
   color: #5c502f;
   font-weight: 800;
+  font-size: 18px;
   cursor: pointer;
   transform: translateX(-50%);
   box-shadow: 0 5px 9px #8d713436;
+}
+.island-select-back {
+  position: absolute;
+  z-index: 9;
+  top: 5%;
+  left: 4%;
+  padding: 11px 17px;
+  border: 1px solid #4d8c83;
+  border-radius: 99px;
+  background: #f4fffbdb;
+  color: #20584d;
+  font-weight: 800;
+  cursor: pointer;
+  box-shadow: 0 3px 8px #32685f2b;
 }
 @media (max-width: 760px) {
   .island-select-preview-art {
@@ -447,6 +494,12 @@ body {
   }
   .island-select-browse {
     top: 71%;
-    width: 220px;
+    width: 270px;
+    padding: 16px 20px;
+    font-size: 16px;
+  }
+  .island-select-back {
+    top: 3%;
+    left: 3%;
   }
 }
