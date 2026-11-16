@@ -6,9 +6,9 @@
 </head>
 <body>
 <main class="islands-page">
-  <header class="islands-head"><a class="brand" href="index.html">ON-DO</a><button id="logout" class="logout">로그아웃</button></header>
+  <header class="islands-head"><span class="brand">ON-DO</span></header>
   <section class="island-selector" aria-labelledby="choiceTitle">
-    <p class="eyebrow">ON-DO</p><h1 id="choiceTitle">어느 섬으로 갈까요?</h1><p class="subcopy">비슷한 마음을 가진 이웃들이 기다리고 있어요.</p>
+    <p class="eyebrow">ON-DO</p><h1 id="choiceTitle">어느 섬으로 갈까요?</h1><p class="subcopy">두 섬을 둘러보고, 마음이 가는 곳으로 떠나보세요.</p>
     <div class="carousel" aria-live="polite">
       <button id="prev" class="round-arrow" aria-label="이전 섬">‹</button>
       <article id="islandCard" class="island-card"></article>
@@ -16,7 +16,6 @@
     </div>
     <div class="dots" aria-label="섬 선택"><button data-index="0" aria-label="첫 번째 섬"></button><button data-index="1" aria-label="두 번째 섬"></button></div>
   </section>
-  <div id="enterLayer" class="enter-layer" hidden aria-live="assertive"><div class="cloud cloud-a"></div><div class="cloud cloud-b"></div><p>섬으로 이동하는 중이에요</p></div>
 </main>
 <script src="js/islands.js"></script>
 </body></html>
