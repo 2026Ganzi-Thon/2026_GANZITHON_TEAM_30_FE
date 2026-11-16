@@ -395,5 +395,6 @@ dialog .categories{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));al
 /* Keep time-selector artwork centered without hover growth. */
 .theme-picker .themes,.theme-picker .themes:hover{transform:none!important}
 .theme-picker .themes button,.theme-picker .themes button:hover{position:relative;overflow:hidden;transform:none!important;width:100%;height:auto;aspect-ratio:1;padding:0;filter:none}
-.theme-picker .themes button img,.theme-picker .themes button[data-theme] img{position:absolute;left:50%;top:50%;inset:auto;display:block;width:72%;height:72%;margin:0;object-fit:contain;transform:translate(-50%,-50%)!important}
-.theme-picker summary img{display:block;width:72%;height:72%;margin:auto;object-fit:contain;transform:none!important}
+.theme-picker .themes button img,.theme-picker .themes button[data-theme] img{position:absolute;inset:auto;left:50%;top:50%;display:block;width:64%!important;height:64%!important;max-width:64%;max-height:64%;margin:0;object-fit:contain;object-position:center;transform:translate(-50%,-50%)!important}
+.theme-picker summary{overflow:hidden}
+.theme-picker summary img{position:absolute;inset:auto;left:50%;top:50%;display:block;width:64%!important;height:64%!important;max-width:64%;max-height:64%;margin:0;object-fit:contain;object-position:center;transform:translate(-50%,-50%)!important}
