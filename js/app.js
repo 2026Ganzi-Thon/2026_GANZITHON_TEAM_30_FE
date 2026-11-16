@@ -9,6 +9,15 @@ const adjectives = [
 const nicknameHistory = new Map();
 let animal = 2, verified = false, draft = {};
 let saved = JSON.parse(localStorage.getItem('ondo-profile') || 'null');
+function showAuth(mode) {
+  const login = mode === 'login';
+  byId('loginForm').hidden = !login;
+  byId('infoTitle').hidden = login;
+  byId('onboard').hidden = login;
+  byId('showLogin').setAttribute('aria-selected', String(login));
+  byId('showSignup').setAttribute('aria-selected', String(!login));
+  byId('loginStatus').textContent = '';
+}
 function show(view) {
   for (const id of ['home','choose','done']) byId(id).hidden = id !== view;
   byId('account').hidden = view !== 'done';
@@ -156,8 +165,21 @@ byId('email').oninput = () => {
   verified = false;
   updateVerification();
 };
-byId('start').onclick = () => { updateVerification(); byId('info').showModal(); };
+byId('showLogin').onclick = () => showAuth('login');
+byId('showSignup').onclick = () => showAuth('signup');
+byId('start').onclick = () => { updateVerification(); showAuth(saved ? 'login' : 'signup'); byId('info').showModal(); };
 byId('close').onclick = () => byId('info').close();
+byId('loginForm').onsubmit = event => {
+  event.preventDefault();
+  const email = byId('loginEmail').value.trim().toLowerCase();
+  saved = JSON.parse(localStorage.getItem('ondo-profile') || 'null');
+  if (!saved?.email || saved.email.toLowerCase() !== email) {
+    byId('loginStatus').textContent = '회원가입 때 인증한 회사 이메일을 확인해주세요.';
+    return;
+  }
+  sessionStorage.setItem('ondo-session', '1');
+  location.href = 'island-select.html';
+};
 byId('verify').onclick = () => {
   if (!byId('email').reportValidity()) return;
   verificationTimer = setTimeout(() => {
@@ -170,7 +192,7 @@ byId('verify').onclick = () => {
 byId('onboard').onsubmit = event => {
   event.preventDefault();
   if (!verified || !byId('job').value) return;
-  draft = {job:byId('job').value, years:byId('years').value};
+  draft = {email:byId('email').value.trim().toLowerCase(), job:byId('job').value, years:byId('years').value};
   byId('info').close();
   byId('email').value = '';
   verified = false;
@@ -200,7 +222,7 @@ byId('profile').onsubmit = event => {
   welcome();
 };
 byId('edit').onclick = () => {
-  draft = {job:saved.job, years:saved.years};
+  draft = {email:saved.email, job:saved.job, years:saved.years};
   select(saved.animal, false);
   byId('nick').value = saved.nick;
   show('choose');
