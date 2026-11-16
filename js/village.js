@@ -15,6 +15,7 @@ const topics = {
 };
 const key = 'ondo-village-v1';
 const state = JSON.parse(localStorage.getItem(key) || '{"posts":[],"replies":{},"theme":"day","read":[]}');
+state.player ??= {x:46,y:62};
 const samples = [
   ['느린곰',0,'피드백을 받을 때마다 제가 부족한 사람 같아요','상사에게 피드백을 받으면 자꾸 자신감이 떨어져요. 다음 일을 시작하기도 전에 걱정부터 앞서요.',0,'업무량·스트레스','2년차',51,44,[]],
   ['작은사슴',1,'회의에서 제 의견을 꺼내기가 어려워요','회의 중에 하고 싶은 말이 있어도 타이밍을 놓쳐요. 다른 분들은 처음에 어떻게 의견을 꺼내셨는지 궁금해요.',1,'직장 내 관계·갈등','1년차',41,50,[['조용한 토끼','저는 회의 전에 한 문장만 미리 적어두니 조금 편했어요.'],['포근한 양','저도 비슷했어요. 먼저 질문으로 말을 시작해 봤어요.']]],
@@ -38,7 +39,7 @@ let comfortFilter = '';
 const activeFilters = () => searchText || comfortFilter;
 const tokenise = text => text.toLowerCase().match(/[\p{L}\p{N}]{2,}/gu) || [];
 let selectedTopic = '';
-let zoom = 1, visiblePins = [];
+let zoom = 1, visiblePins = [], recentWorryIds = new Set();
 let searchText = '', tab = 'alerts', editing = null, deleting = null, toastTimer;
 
 function toast(message) {
@@ -60,6 +61,7 @@ function renderTheme() {
 }
 function renderFeed() {
   const list = [...own().filter(p=>!p.private), ...samples];
+  recentWorryIds = new Set(list.slice(0,3).map(p=>p.id));
   const words = tokenise(searchText);
   const score = p => words.filter(word => [p.title,p.body,p.topic].join(' ').toLowerCase().includes(word)).length;
   const visible = list.filter(p => (!searchText || score(p) > 0) &&
@@ -77,8 +79,12 @@ function renderFeed() {
 const clusterPoint = {x:31,y:57};
 const revealZoom = 2.4;
 function renderMarkers() {
+  const player = `<div class="marker player-marker" style="left:${state.player.x}%;top:${state.player.y}%" aria-label="내 캐릭터 ${escapeText(me.nick)}">
+    <img src="${img(me.animal)}" alt="">
+    <span class="player-name">${escapeText(me.nick)}</span>
+  </div>`;
   if (zoom < revealZoom && visiblePins.length > 0) {
-    el('markers').innerHTML = `<button class="marker cluster" style="left:${clusterPoint.x}%;top:${clusterPoint.y}%" data-cluster aria-label="고민 ${visiblePins.length}개 확대해서 보기">${visiblePins.length}</button>`;
+    el('markers').innerHTML = `<button class="marker cluster" style="left:${clusterPoint.x}%;top:${clusterPoint.y}%" data-cluster aria-label="고민 ${visiblePins.length}개 확대해서 보기">${visiblePins.length}</button>${player}`;
     return;
   }
   const total = visiblePins.length;
@@ -87,11 +93,13 @@ function renderMarkers() {
     const radius = total === 1 ? 0 : 3 + Math.sqrt(i)*2;
     const x = clusterPoint.x + Math.cos(angle)*radius;
     const y = clusterPoint.y + Math.sin(angle)*radius*1.15;
+    const isNew = recentWorryIds.has(p.id);
     return `<div class="marker author-pin" style="left:${x}%;top:${y}%">
-      <button class="worry-tag" data-post="${p.id}" aria-label="${escapeText(p.nick)}의 고민">● 고민</button>
+      <button class="worry-tag${isNew ? ' is-new' : ''}" data-post="${p.id}" aria-label="${escapeText(p.nick)}의 고민${isNew ? ' · 최근 고민' : ''}">${isNew ? '' : '● '}고민</button>
       <img src="${img(p.animal)}" alt="${escapeText(p.nick)}의 캐릭터">
+      <span class="author-name">${escapeText(p.nick)}</span>
     </div>`;
-  }).join('');
+  }).join('') + player;
 }
 
 function showPost(id, open = true) {
@@ -494,10 +502,13 @@ if (me && sessionStorage.getItem('ondo-session')) {
     changeZoom(zoom*Math.exp(-Math.max(-100,Math.min(100,event.deltaY))*.0035),event.clientX,event.clientY);
   },{passive:false});
   const pointers = new Map();
+  let pointerOrigin = null, movedMap = false;
   let pinchDistance = 0;
   const distance = (a,b)=>Math.hypot(a.x-b.x,a.y-b.y);
   map.onpointerdown=event=>{
     if (event.button!==0 || event.target.closest('button')) return;
+    pointerOrigin={x:event.clientX,y:event.clientY};
+    movedMap=false;
     pointers.set(event.pointerId,{x:event.clientX,y:event.clientY});
     if (pointers.size===2) pinchDistance=distance(...pointers.values());
     drag={x:event.clientX-dx,y:event.clientY-dy};
@@ -505,6 +516,7 @@ if (me && sessionStorage.getItem('ondo-session')) {
   };
   map.onpointermove=event=>{
     if (!pointers.has(event.pointerId)) return;
+    if (pointerOrigin && Math.hypot(event.clientX-pointerOrigin.x,event.clientY-pointerOrigin.y)>6) movedMap=true;
     pointers.set(event.pointerId,{x:event.clientX,y:event.clientY});
     if (pointers.size===2) {
       const [a,b]=pointers.values();
@@ -522,6 +534,19 @@ if (me && sessionStorage.getItem('ondo-session')) {
     drag=remaining?{x:remaining.x-dx,y:remaining.y-dy}:null;
     pinchDistance=0;
   };
+  map.addEventListener('click',event=>{
+    if (event.target.closest('button') || movedMap) {movedMap=false;return;}
+    const box=world.getBoundingClientRect();
+    const x=Math.max(4,Math.min(96,(event.clientX-box.left)/box.width*100));
+    const y=Math.max(7,Math.min(93,(event.clientY-box.top)/box.height*100));
+    state.player={x:Number(x.toFixed(2)),y:Number(y.toFixed(2))};
+    save();
+    const player=el('markers').querySelector('.player-marker');
+    if (player) {
+      player.style.left=state.player.x+'%';
+      player.style.top=state.player.y+'%';
+    } else renderMarkers();
+  });
   new ResizeObserver(positionMap).observe(map);
   document.addEventListener('click',event=>{
     for (const category of el('categories').querySelectorAll('details[open]')) {

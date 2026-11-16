@@ -40,7 +40,7 @@ let comfortFilter = '';
 const activeFilters = () => searchText || comfortFilter;
 const tokenise = text => text.toLowerCase().match(/[\p{L}\p{N}]{2,}/gu) || [];
 let selectedTopic = '';
-let zoom = 1, visiblePins = [];
+let zoom = 1, visiblePins = [], recentWorryIds = new Set();
 let searchText = '', tab = 'alerts', editing = null, deleting = null, toastTimer;
 
 function toast(message) {
@@ -62,6 +62,7 @@ function renderTheme() {
 }
 function renderFeed() {
   const list = [...own().filter(p=>!p.private), ...samples];
+  recentWorryIds = new Set(list.slice(0,3).map(p=>p.id));
   const words = tokenise(searchText);
   const score = p => words.filter(word => [p.title,p.body,p.topic].join(' ').toLowerCase().includes(word)).length;
   const visible = list.filter(p => (!searchText || score(p) > 0) &&
@@ -93,9 +94,9 @@ function renderMarkers() {
     const radius = total === 1 ? 0 : 3 + Math.sqrt(i)*2;
     const x = clusterPoint.x + Math.cos(angle)*radius;
     const y = clusterPoint.y + Math.sin(angle)*radius*1.15;
-    const isNew = p.fresh || p.time === '방금';
+    const isNew = recentWorryIds.has(p.id);
     return `<div class="marker author-pin" style="left:${x}%;top:${y}%">
-      <button class="worry-tag${isNew ? ' is-new' : ''}" data-post="${p.id}" aria-label="${escapeText(p.nick)}의 고민${isNew ? ' · 새 고민' : ''}">● 고민</button>
+      <button class="worry-tag${isNew ? ' is-new' : ''}" data-post="${p.id}" aria-label="${escapeText(p.nick)}의 고민${isNew ? ' · 최근 고민' : ''}">${isNew ? '' : '● '}고민</button>
       <img src="${img(p.animal)}" alt="${escapeText(p.nick)}의 캐릭터">
       <span class="author-name">${escapeText(p.nick)}</span>
     </div>`;
@@ -105,11 +106,6 @@ function renderMarkers() {
 function showPost(id, open = true) {
   const p = find(id);
   if (!p) return;
-  if (p.fresh) {
-    p.fresh = false;
-    save();
-    renderMarkers();
-  }
   const replies = repliesFor(p);
   el('detailBody').innerHTML = `<div class="between"><div class="row"><img class="detail-avatar" src="${img(p.animal)}" alt=""><div><strong>${escapeText(p.nick)}</strong><small>${escapeText(p.job)}</small></div></div><button data-close="detail" class="soft">닫기</button></div>
     <small class="detail-meta">${escapeText(p.topic)} · ${p.private ? '나만보기' : ways[p.way]}</small>
@@ -392,8 +388,7 @@ if (unifiedProfile) {
       nick:unifiedProfile.nick,animal:unifiedProfile.animal,job:unifiedProfile.job,years:el('shareYears').checked ? unifiedProfile.years : '', x:50,y:55,
       title:el('postTitle').value.trim(),body:el('body').value.trim(),
       topic:selectedTopic,way:Number(new FormData(event.currentTarget).get('way')),
-      private:el('privatePost').checked,
-      fresh:!editing
+      private:el('privatePost').checked
     };
     if (p.title.length > 40 || p.body.length > 1000) {
       const field = p.title.length > 40 ? el('postTitle') : el('body');
