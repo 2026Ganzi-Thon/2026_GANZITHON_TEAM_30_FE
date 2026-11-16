@@ -406,3 +406,47 @@ body {
 .island-select-count {
   display: none !important;
 }
+.island-select-carousel.is-preview::before,
+.island-select-carousel.is-preview::after,
+.island-select-carousel.is-preview > button {
+  display: none !important;
+}
+.island-select-preview-art {
+  position: absolute;
+  z-index: 5;
+  left: 50%;
+  top: 28%;
+  width: min(40vw, 620px);
+  height: 42vh;
+  object-fit: contain;
+  transform: translateX(-50%);
+  filter: drop-shadow(0 13px 10px #166d633c);
+  animation: island-float 4.4s ease-in-out infinite;
+}
+.island-select-browse {
+  position: absolute;
+  z-index: 7;
+  left: 50%;
+  top: 73%;
+  width: 270px;
+  padding: 14px 20px;
+  border: 0;
+  border-radius: 99px;
+  background: #f9d98e;
+  color: #5c502f;
+  font-weight: 800;
+  cursor: pointer;
+  transform: translateX(-50%);
+  box-shadow: 0 5px 9px #8d713436;
+}
+@media (max-width: 760px) {
+  .island-select-preview-art {
+    top: 27%;
+    width: 76vw;
+    height: 38vh;
+  }
+  .island-select-browse {
+    top: 71%;
+    width: 220px;
+  }
+}
