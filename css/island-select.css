@@ -1,7 +1,6 @@
 :root {
   font-family: "Malgun Gothic", "Apple SD Gothic Neo", sans-serif;
   color: #153e3a;
-  --island-half-width: min(19vw, 295px);
 }
 * {
   box-sizing: border-box;
@@ -78,9 +77,9 @@ body {
 .island-select-route {
   position: absolute;
   z-index: -1;
-  left: calc(50% + var(--island-half-width));
+  left: 50%;
   top: 54%;
-  transform: none;
+  transform: translateX(-12%);
   width: min(57vw, 870px);
   height: 13vh;
   object-fit: fill;
@@ -88,7 +87,7 @@ body {
 .island-select-boat {
   position: absolute;
   z-index: 5;
-  left: calc(50% + var(--island-half-width) + 28px);
+  left: 52%;
   top: 58%;
   transform: translateX(-50%);
   width: 61px;
@@ -298,9 +297,6 @@ body {
   }
 }
 @media (max-width: 760px) {
-  :root {
-    --island-half-width: 35vw;
-  }
   .island-select-stage h1 {
     top: 9vh;
     font-size: 30px;
@@ -399,11 +395,11 @@ body {
 }
 .island-select-card[data-kind="job"] .island-select-route {
   left: auto !important;
-  right: calc(50% + var(--island-half-width)) !important;
+  right: 48% !important;
   transform: scaleX(-1) !important;
 }
 .island-select-card[data-kind="job"] .island-select-boat {
-  left: calc(50% - var(--island-half-width) - 28px) !important;
+  left: 42% !important;
   top: 58% !important;
 }
 .island-select-page-dot,
