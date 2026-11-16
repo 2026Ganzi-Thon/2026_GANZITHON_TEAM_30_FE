@@ -16,6 +16,7 @@ const topics = {
 };
 const key = 'ondo-unified-v1';
 const state = JSON.parse(localStorage.getItem(key) || '{"posts":[],"replies":{},"theme":"day","read":[]}');
+state.player ??= {x:46,y:62};
 const samples = [
   ['느린곰',0,'피드백을 받을 때마다 제가 부족한 사람 같아요','상사에게 피드백을 받으면 자꾸 자신감이 떨어져요. 다음 일을 시작하기도 전에 걱정부터 앞서요.',0,'업무량·스트레스','2년차',51,44,[]],
   ['작은사슴',1,'회의에서 제 의견을 꺼내기가 어려워요','회의 중에 하고 싶은 말이 있어도 타이밍을 놓쳐요. 다른 분들은 처음에 어떻게 의견을 꺼내셨는지 궁금해요.',1,'직장 내 관계·갈등','1년차',41,50,[['조용한 토끼','저는 회의 전에 한 문장만 미리 적어두니 조금 편했어요.'],['포근한 양','저도 비슷했어요. 먼저 질문으로 말을 시작해 봤어요.']]],
@@ -68,7 +69,7 @@ function renderFeed() {
   if (searchText) visible.sort((a,b)=>score(b)-score(a));
   el('count').textContent = (activeFilters() ? '조건에 맞는 고민 ' : '최근 올라온 고민 ') + visible.length;
   el('reset').hidden = !activeFilters();
-  el('feed').innerHTML = visible.map(p => `<button class="card" data-post="${p.id}">
+  el('feed').innerHTML = visible.map(p => `<button class="card${p.fresh || p.time === '방금' ? ' is-new' : ''}" data-post="${p.id}">
     <small class="mode">${ways[p.way]} · ${p.time || '방금'}</small><strong>${escapeText(p.title)}</strong>
     <small>${escapeText(p.nick)} · ${escapeText(p.job)}</small>
     <small>${escapeText(p.topic)} · 답글 ${repliesFor(p).length}</small></button>`).join('') || '<p>조건에 맞는 고민이 없어요.</p>';
@@ -78,8 +79,13 @@ function renderFeed() {
 const clusterPoint = {x:31,y:57};
 const revealZoom = 2.4;
 function renderMarkers() {
+  const player = `<div class="marker player-marker" style="left:${state.player.x}%;top:${state.player.y}%" aria-label="내 캐릭터 ${escapeText(unifiedProfile.nick)}">
+    <img src="${img(unifiedProfile.animal)}" alt="">
+    <span class="player-name">${escapeText(unifiedProfile.nick)}</span>
+  </div>`;
   if (zoom < revealZoom && visiblePins.length > 0) {
-    el('markers').innerHTML = `<button class="marker cluster" style="left:${clusterPoint.x}%;top:${clusterPoint.y}%" data-cluster aria-label="고민 ${visiblePins.length}개 확대해서 보기">${visiblePins.length}</button>`;
+    const hasNew = visiblePins.some(p=>p.fresh || p.time === '방금');
+    el('markers').innerHTML = `<button class="marker cluster${hasNew ? ' has-new' : ''}" style="left:${clusterPoint.x}%;top:${clusterPoint.y}%" data-cluster aria-label="고민 ${visiblePins.length}개 확대해서 보기">${visiblePins.length}</button>${player}`;
     return;
   }
   const total = visiblePins.length;
@@ -88,16 +94,22 @@ function renderMarkers() {
     const radius = total === 1 ? 0 : 3 + Math.sqrt(i)*2;
     const x = clusterPoint.x + Math.cos(angle)*radius;
     const y = clusterPoint.y + Math.sin(angle)*radius*1.15;
+    const isNew = p.fresh || p.time === '방금';
     return `<div class="marker author-pin" style="left:${x}%;top:${y}%">
-      <button class="worry-tag" data-post="${p.id}" aria-label="${escapeText(p.nick)}의 고민">● 고민</button>
+      <button class="worry-tag${isNew ? ' is-new' : ''}" data-post="${p.id}" aria-label="${escapeText(p.nick)}의 고민${isNew ? ' · 새 고민' : ''}">● 고민</button>
       <img src="${img(p.animal)}" alt="${escapeText(p.nick)}의 캐릭터">
     </div>`;
-  }).join('');
+  }).join('') + player;
 }
 
 function showPost(id, open = true) {
   const p = find(id);
   if (!p) return;
+  if (p.fresh) {
+    p.fresh = false;
+    save();
+    renderMarkers();
+  }
   const replies = repliesFor(p);
   el('detailBody').innerHTML = `<div class="between"><div class="row"><img class="detail-avatar" src="${img(p.animal)}" alt=""><div><strong>${escapeText(p.nick)}</strong><small>${escapeText(p.job)}</small></div></div><button data-close="detail" class="soft">닫기</button></div>
     <small class="detail-meta">${escapeText(p.topic)} · ${p.private ? '나만보기' : ways[p.way]}</small>
@@ -380,7 +392,8 @@ if (unifiedProfile) {
       nick:unifiedProfile.nick,animal:unifiedProfile.animal,job:unifiedProfile.job,years:el('shareYears').checked ? unifiedProfile.years : '', x:50,y:55,
       title:el('postTitle').value.trim(),body:el('body').value.trim(),
       topic:selectedTopic,way:Number(new FormData(event.currentTarget).get('way')),
-      private:el('privatePost').checked
+      private:el('privatePost').checked,
+      fresh:!editing
     };
     if (p.title.length > 40 || p.body.length > 1000) {
       const field = p.title.length > 40 ? el('postTitle') : el('body');
@@ -495,10 +508,13 @@ if (unifiedProfile) {
     changeZoom(zoom*Math.exp(-Math.max(-100,Math.min(100,event.deltaY))*.0035),event.clientX,event.clientY);
   },{passive:false});
   const pointers = new Map();
+  let pointerOrigin = null, movedMap = false;
   let pinchDistance = 0;
   const distance = (a,b)=>Math.hypot(a.x-b.x,a.y-b.y);
   map.onpointerdown=event=>{
     if (event.button!==0 || event.target.closest('button')) return;
+    pointerOrigin={x:event.clientX,y:event.clientY};
+    movedMap=false;
     pointers.set(event.pointerId,{x:event.clientX,y:event.clientY});
     if (pointers.size===2) pinchDistance=distance(...pointers.values());
     drag={x:event.clientX-dx,y:event.clientY-dy};
@@ -506,6 +522,7 @@ if (unifiedProfile) {
   };
   map.onpointermove=event=>{
     if (!pointers.has(event.pointerId)) return;
+    if (pointerOrigin && Math.hypot(event.clientX-pointerOrigin.x,event.clientY-pointerOrigin.y)>6) movedMap=true;
     pointers.set(event.pointerId,{x:event.clientX,y:event.clientY});
     if (pointers.size===2) {
       const [a,b]=pointers.values();
@@ -523,6 +540,19 @@ if (unifiedProfile) {
     drag=remaining?{x:remaining.x-dx,y:remaining.y-dy}:null;
     pinchDistance=0;
   };
+  map.addEventListener('click',event=>{
+    if (event.target.closest('button') || movedMap) {movedMap=false;return;}
+    const box=world.getBoundingClientRect();
+    const x=Math.max(4,Math.min(96,(event.clientX-box.left)/box.width*100));
+    const y=Math.max(7,Math.min(93,(event.clientY-box.top)/box.height*100));
+    state.player={x:Number(x.toFixed(2)),y:Number(y.toFixed(2))};
+    save();
+    const player=el('markers').querySelector('.player-marker');
+    if (player) {
+      player.style.left=state.player.x+'%';
+      player.style.top=state.player.y+'%';
+    } else renderMarkers();
+  });
   new ResizeObserver(positionMap).observe(map);
   document.addEventListener('click',event=>{
     for (const category of el('categories').querySelectorAll('details[open]')) {
