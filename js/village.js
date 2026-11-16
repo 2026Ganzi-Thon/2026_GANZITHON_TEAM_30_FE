@@ -19,6 +19,7 @@ const img = (index) =>
   Number.isInteger(index) && index >= 0 && index < 13
     ? "assets/characters/" + index + ".png"
     : "assets/characters/0.png";
+const characterNames = ["쥐", "소", "호랑이", "토끼", "용", "뱀", "말", "양", "원숭이", "닭", "개", "돼지", "사자"];
 const ways = ["들어주세요", "경험을 나눠주세요", "함께 생각해주세요"];
 const topics = {
   "업무·직장생활": [
@@ -228,18 +229,25 @@ function renderFeed() {
 const clusterPoint = { x: 31, y: 57 };
 const revealZoom = 2.4;
 function renderMarkers() {
+  const ownPostIds = new Set(state.posts.map((p) => p.id));
+  const myWorry = visiblePins.find((p) => ownPostIds.has(p.id));
+  const otherPins = visiblePins.filter((p) => !ownPostIds.has(p.id));
+  const playerWorry = myWorry
+    ? `<button class="worry-tag player-worry${recentWorryIds.has(myWorry.id) ? " is-new" : ""}" data-post="${myWorry.id}" aria-label="내 고민">${recentWorryIds.has(myWorry.id) ? "" : "● "}고민</button>`
+    : "";
   const player = `<div class="marker player-marker" style="left:${state.player.x}%;top:${state.player.y}%" aria-label="내 캐릭터 ${escapeText(me.nick)}">
+    ${playerWorry}
     <img src="${img(me.animal)}" alt="">
     <span class="player-name">${escapeText(me.nick)}</span>
   </div>`;
-  if (zoom < revealZoom && visiblePins.length > 0) {
+  if (zoom < revealZoom && otherPins.length > 0) {
     el("markers").innerHTML =
-      `<button class="marker cluster" style="left:${clusterPoint.x}%;top:${clusterPoint.y}%" data-cluster aria-label="고민 ${visiblePins.length}개 확대해서 보기">${visiblePins.length}</button>${player}`;
+      `<button class="marker cluster" style="left:${clusterPoint.x}%;top:${clusterPoint.y}%" data-cluster aria-label="고민 ${otherPins.length}개 확대해서 보기">${otherPins.length}</button>${player}`;
     return;
   }
-  const total = visiblePins.length;
+  const total = otherPins.length;
   el("markers").innerHTML =
-    visiblePins
+    otherPins
       .map((p, i) => {
         const angle = i * 2.399963;
         const radius = total === 1 ? 0 : 3 + Math.sqrt(i) * 2;
@@ -296,6 +304,7 @@ function personal(detail = null) {
     ["alerts", unread ? "댓글 알림 " + unread : "댓글 알림"],
     ["private", "나만보기"],
     ["own", "내 고민"],
+    ["settings", "캐릭터 설정"],
   ];
   const heading = detail
     ? "댓글 상세"
@@ -315,6 +324,11 @@ function personal(detail = null) {
     </button>`,
       )
       .join("");
+  } else if (tab === "settings") {
+    content = `<form id="profileSettings" class="profile-settings">
+      <label for="profileNick">닉네임</label><input id="profileNick" maxlength="18" required value="${escapeText(me.nick)}">
+      <strong>캐릭터</strong><div class="profile-character-grid">${characterNames.map((name, index) => `<button type="button" data-profile-animal="${index}" aria-label="${name}" aria-pressed="${index === me.animal}"><img src="${img(index)}" alt=""><span>${name}</span></button>`).join("")}</div>
+      <button class="wide">변경사항 저장</button></form>`;
   } else {
     content =
       own()
@@ -328,6 +342,38 @@ function personal(detail = null) {
   }
   section.innerHTML = `<div class="between"><h3>${heading}</h3><button id="hideProfile" class="soft">닫기</button></div>
     ${detail ? "" : '<div class="row personal-tabs">' + tabs.map(([id, label]) => `<button data-tab="${id}" ${id === tab ? "" : 'class="soft"'} aria-pressed="${id === tab}">${label}</button>`).join("") + "</div>"}${content}`;
+  if (!detail && tab === "settings") setupProfileSettings(section);
+}
+function setupProfileSettings(section) {
+  let selectedAnimal = me.animal;
+  const buttons = [...section.querySelectorAll("[data-profile-animal]")];
+  for (const button of buttons) button.onclick = () => {
+    selectedAnimal = Number(button.dataset.profileAnimal);
+    for (const choice of buttons) choice.setAttribute("aria-pressed", String(choice === button));
+  };
+  el("profileSettings").onsubmit = (event) => {
+    event.preventDefault();
+    const nick = el("profileNick").value.trim();
+    if (!nick) return el("profileNick").reportValidity();
+    const oldNick = me.nick;
+    for (const post of state.posts) if (post.nick === oldNick) { post.nick = nick; post.animal = selectedAnimal; }
+    for (const replies of Object.values(state.replies)) for (const reply of replies) if (reply[0] === oldNick) reply[0] = nick;
+    me.nick = nick;
+    me.animal = selectedAnimal;
+    localStorage.setItem("ondo-profile", JSON.stringify(me));
+    const unifiedState = JSON.parse(localStorage.getItem("ondo-unified-v1") || "null");
+    if (unifiedState) {
+      for (const post of unifiedState.posts || []) if (post.nick === oldNick) { post.nick = nick; post.animal = selectedAnimal; }
+      for (const replies of Object.values(unifiedState.replies || {})) for (const reply of replies) if (reply[0] === oldNick) reply[0] = nick;
+      localStorage.setItem("ondo-unified-v1", JSON.stringify(unifiedState));
+    }
+    save();
+    el("myName").textContent = me.nick;
+    el("avatar").src = img(me.animal);
+    renderFeed();
+    personal();
+    toast("캐릭터와 닉네임을 변경했어요.");
+  };
 }
 function closeProfile() {
   el("personal").hidden = true;
