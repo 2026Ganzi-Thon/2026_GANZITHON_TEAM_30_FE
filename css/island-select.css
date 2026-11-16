@@ -77,8 +77,8 @@ body {
 .island-select-route {
   position: absolute;
   z-index: -1;
-  left: 50%;
-  top: 54%;
+  left: 55%;
+  top: 60%;
   transform: translateX(-12%);
   width: min(57vw, 870px);
   height: 13vh;
@@ -88,7 +88,7 @@ body {
   position: absolute;
   z-index: 5;
   left: 52%;
-  top: 58%;
+  top: 62%;
   transform: translateX(-50%);
   width: 61px;
 }
@@ -427,12 +427,13 @@ body {
 }
 .island-select-card[data-kind="job"] .island-select-route {
   left: auto !important;
-  right: 48% !important;
+  right: 55% !important;
+  top: 58% !important;
   transform: scaleX(-1) !important;
 }
 .island-select-card[data-kind="job"] .island-select-boat {
-  left: 42% !important;
-  top: 58% !important;
+  left: 40% !important;
+  top: 63% !important;
 }
 .island-select-page-dot,
 .island-select-count {
@@ -460,14 +461,14 @@ body {
   z-index: 7;
   left: 50%;
   top: 73%;
-  width: 340px;
-  padding: 18px 24px;
+  width: 310px;
+  padding: 16px 22px;
   border: 0;
   border-radius: 99px;
   background: #f9d98e;
   color: #5c502f;
   font-weight: 800;
-  font-size: 18px;
+  font-size: 17px;
   cursor: pointer;
   transform: translateX(-50%);
   box-shadow: 0 5px 9px #8d713436;
@@ -494,9 +495,9 @@ body {
   }
   .island-select-browse {
     top: 71%;
-    width: 270px;
-    padding: 16px 20px;
-    font-size: 16px;
+    width: 250px;
+    padding: 14px 18px;
+    font-size: 15px;
   }
   .island-select-back {
     top: 3%;
