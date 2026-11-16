@@ -69,7 +69,7 @@ function renderFeed() {
   if (searchText) visible.sort((a,b)=>score(b)-score(a));
   el('count').textContent = (activeFilters() ? '조건에 맞는 고민 ' : '최근 올라온 고민 ') + visible.length;
   el('reset').hidden = !activeFilters();
-  el('feed').innerHTML = visible.map(p => `<button class="card${p.fresh || p.time === '방금' ? ' is-new' : ''}" data-post="${p.id}">
+  el('feed').innerHTML = visible.map(p => `<button class="card" data-post="${p.id}">
     <small class="mode">${ways[p.way]} · ${p.time || '방금'}</small><strong>${escapeText(p.title)}</strong>
     <small>${escapeText(p.nick)} · ${escapeText(p.job)}</small>
     <small>${escapeText(p.topic)} · 답글 ${repliesFor(p).length}</small></button>`).join('') || '<p>조건에 맞는 고민이 없어요.</p>';
@@ -84,8 +84,7 @@ function renderMarkers() {
     <span class="player-name">${escapeText(unifiedProfile.nick)}</span>
   </div>`;
   if (zoom < revealZoom && visiblePins.length > 0) {
-    const hasNew = visiblePins.some(p=>p.fresh || p.time === '방금');
-    el('markers').innerHTML = `<button class="marker cluster${hasNew ? ' has-new' : ''}" style="left:${clusterPoint.x}%;top:${clusterPoint.y}%" data-cluster aria-label="고민 ${visiblePins.length}개 확대해서 보기">${visiblePins.length}</button>${player}`;
+    el('markers').innerHTML = `<button class="marker cluster" style="left:${clusterPoint.x}%;top:${clusterPoint.y}%" data-cluster aria-label="고민 ${visiblePins.length}개 확대해서 보기">${visiblePins.length}</button>${player}`;
     return;
   }
   const total = visiblePins.length;
@@ -96,8 +95,9 @@ function renderMarkers() {
     const y = clusterPoint.y + Math.sin(angle)*radius*1.15;
     const isNew = p.fresh || p.time === '방금';
     return `<div class="marker author-pin" style="left:${x}%;top:${y}%">
-      <button class="worry-tag${isNew ? ' is-new' : ''}" data-post="${p.id}" aria-label="${escapeText(p.nick)}의 고민${isNew ? ' · 새 고민' : ''}">● 고민</button>
+      <button class="worry-tag${isNew ? ' is-new' : ''}" data-post="${p.id}" aria-label="${escapeText(p.nick)}의 고민${isNew ? ' · 새 고민' : ''}">고민</button>
       <img src="${img(p.animal)}" alt="${escapeText(p.nick)}의 캐릭터">
+      <span class="author-name">${escapeText(p.nick)}</span>
     </div>`;
   }).join('') + player;
 }
