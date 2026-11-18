@@ -25,22 +25,39 @@ function show(view) {
   heading.tabIndex = -1;
   heading.focus();
 }
-function recommend() {
+
+let nicknameRequest = 0;
+
+async function recommend() {
+  const requestId = ++nicknameRequest;
   const nick = byId('nick');
-  const suffix = ' ' + names[animal];
-  let used = nicknameHistory.get(animal);
-  if (!used || used.size === adjectives.length) {
-    used = new Set();
-    nicknameHistory.set(animal, used);
+  const submit = byId('profile').querySelector('button.wide');
+
+  nick.readOnly = true;
+  nick.maxLength = 40;
+  nick.value = '';
+  nick.placeholder = '닉네임을 추천받고 있어요...';
+  submit.disabled = true;
+
+  try {
+    const result = await api(
+      `/auth/nickname?character=${CHARACTER_KEYS[animal]}`,
+      { auth: false }
+    );
+
+    if (requestId !== nicknameRequest) return;
+
+    nick.setCustomValidity('');
+    nick.value = result.nickname;
+    submit.disabled = false;
+  } catch (error) {
+    if (requestId !== nicknameRequest) return;
+
+    nick.placeholder = '다시 추첨하기를 눌러주세요.';
+    alert(error.message);
   }
-  const candidates = adjectives.filter(word => !used.has(word));
-  const alternatives = candidates.filter(word => word + suffix !== nick.value.trim());
-  const pool = alternatives.length ? alternatives : candidates;
-  const word = pool[Math.floor(Math.random() * pool.length)];
-  used.add(word);
-  nick.setCustomValidity('');
-  nick.value = word + suffix;
 }
+
 const jobIcons = {
   '디자인': 'design',
   '개발': 'development',
@@ -150,56 +167,244 @@ for (const id of ['job','years']) {
     trigger.focus();
   });
 }
+
 let verificationTimer;
+let resendUntil = 0;
+let sendingCode = false;
+let codeEmail = '';
+
 function updateVerification() {
-  byId('continue').disabled = !verified || !byId('job').value;
-  byId('verify').disabled = !byId('email').validity.valid || verified || Boolean(verificationTimer);
-  byId('verify').textContent = verified ? '인증 완료되었습니다!' : verificationTimer ? '인증 중입니다 ...' : '인증 메일 받기';
-  byId('verify').classList.toggle('email-ready', verified || Boolean(verificationTimer));
-  byId('status').hidden = !verified;
-  byId('status').textContent = verified ? '체험용 인증이 완료됐어요.' : '';
+  const email = byId('email').value.trim().toLowerCase();
+  const remaining = Math.max(
+    0,
+    Math.ceil((resendUntil - Date.now()) / 1000)
+  );
+
+  byId('verify').disabled =
+    !byId('email').validity.valid || sendingCode || remaining > 0;
+
+  byId('verify').textContent = sendingCode
+    ? '요청 중...'
+    : remaining > 0
+      ? `재전송 (${remaining}초)`
+      : verified
+        ? '인증코드 다시 받기'
+        : '인증 메일 받기';
+
+  byId('continue').disabled =
+    !verified ||
+    email !== codeEmail ||
+    !/^[0-9]{6}$/.test(byId('signupCode').value.trim()) ||
+    !byId('job').value ||
+    !byId('agreePrivacy').checked;
 }
+
 byId('email').oninput = () => {
-  clearTimeout(verificationTimer);
-  verificationTimer = null;
   verified = false;
+  codeEmail = '';
+  byId('signupCode').value = '';
+  byId('status').hidden = true;
   updateVerification();
 };
+
+byId('signupCode').oninput = updateVerification;
+byId('agreePrivacy').onchange = updateVerification;
+
 byId('showLogin').onclick = () => showAuth('login');
 byId('showSignup').onclick = () => showAuth('signup');
 byId('start').onclick = () => { updateVerification(); showAuth(saved ? 'login' : 'signup'); byId('info').showModal(); };
 byId('close').onclick = () => byId('info').close();
-byId('loginForm').onsubmit = event => {
-  event.preventDefault();
+let loginResendUntil = 0;
+let loginCodeTimer;
+let loginSending = false;
+
+function updateLoginCodeButton() {
+  const remaining = Math.max(
+    0,
+    Math.ceil((loginResendUntil - Date.now()) / 1000)
+  );
+
+  byId('loginSendCode').disabled = loginSending || remaining > 0;
+  byId('loginSendCode').textContent = loginSending
+    ? '요청 중...'
+    : remaining > 0
+      ? `재전송 (${remaining}초)`
+      : '로그인 인증코드 받기';
+}
+
+byId('loginEmail').oninput = () => {
+  byId('loginCode').value = '';
+  byId('loginStatus').textContent = '';
+};
+
+byId('loginSendCode').onclick = async () => {
+  if (!byId('loginEmail').reportValidity()) return;
+
   const email = byId('loginEmail').value.trim().toLowerCase();
-  saved = JSON.parse(localStorage.getItem('ondo-profile') || 'null');
-  if (!saved?.email || saved.email.toLowerCase() !== email) {
-    byId('loginStatus').textContent = '회원가입 때 인증한 회사 이메일을 확인해주세요.';
-    return;
+
+  loginSending = true;
+  byId('loginCode').value = '';
+  byId('loginStatus').textContent = '인증코드를 요청하고 있어요.';
+  updateLoginCodeButton();
+
+  try {
+    const result = await api('/auth/email-code', {
+      method: 'POST',
+      auth: false,
+      body: { email, purpose: 'login' }
+    });
+
+    loginResendUntil = Date.now() + result.resend_after * 1000;
+
+    clearInterval(loginCodeTimer);
+    loginCodeTimer = setInterval(() => {
+      updateLoginCodeButton();
+
+      if (Date.now() >= loginResendUntil) {
+        clearInterval(loginCodeTimer);
+      }
+    }, 1000);
+
+    if (byId('loginEmail').value.trim().toLowerCase() !== email) return;
+
+    byId('loginStatus').textContent = result.demo_code
+      ? `체험용 인증코드: ${result.demo_code} (5분 동안 유효)`
+      : '이메일로 인증코드를 보냈어요.';
+
+    byId('loginCode').focus();
+  } catch (error) {
+    byId('loginStatus').textContent = error.message;
+  } finally {
+    loginSending = false;
+    updateLoginCodeButton();
   }
-  sessionStorage.setItem('ondo-session', '1');
-  location.href = 'island-select.html';
 };
-byId('verify').onclick = () => {
+
+byId('loginForm').onsubmit = async event => {
+  event.preventDefault();
+
+  const submit = byId('loginSubmit');
+  if (submit.disabled) return;
+
+  submit.disabled = true;
+  submit.textContent = '로그인 중...';
+
+  try {
+    const result = await api('/auth/login', {
+      method: 'POST',
+      auth: false,
+      body: {
+        email: byId('loginEmail').value.trim().toLowerCase(),
+        code: byId('loginCode').value.trim()
+      }
+    });
+
+    localStorage.setItem('ondo-token', result.access_token);
+
+    const me = await api('/auth/me');
+
+    // 기존 화면이 사용하는 이름으로 변환해 보관
+    saved = {
+      id: me.id,
+      email: me.email,
+      job: me.job,
+      years: me.years || '',
+      nick: me.nickname,
+      animal: CHARACTER_KEYS.indexOf(me.character)
+    };
+
+    localStorage.setItem('ondo-profile', JSON.stringify(saved));
+    sessionStorage.setItem('ondo-session', '1');
+
+    location.href = 'island-select.html';
+  } catch (error) {
+    byId('loginStatus').textContent = error.message;
+  } finally {
+    submit.disabled = false;
+    submit.textContent = '로그인';
+  }
+};
+
+byId('verify').onclick = async () => {
   if (!byId('email').reportValidity()) return;
-  verificationTimer = setTimeout(() => {
-    verificationTimer = null;
-    verified = true;
-    updateVerification();
-  }, 450);
+
+  const email = byId('email').value.trim().toLowerCase();
+
+  sendingCode = true;
+  verified = false;
+  codeEmail = '';
+  byId('signupCode').value = '';
+  byId('status').hidden = false;
+  byId('status').textContent = '인증코드를 요청하고 있어요.';
   updateVerification();
+
+  try {
+    const result = await api('/auth/email-code', {
+      method: 'POST',
+      auth: false,
+      body: { email, purpose: 'signup' }
+    });
+
+    resendUntil = Date.now() + result.resend_after * 1000;
+
+    clearInterval(verificationTimer);
+    verificationTimer = setInterval(() => {
+      updateVerification();
+
+      if (Date.now() >= resendUntil) {
+        clearInterval(verificationTimer);
+        verificationTimer = null;
+      }
+    }, 1000);
+
+    // 요청 중 이메일을 변경했다면 이전 이메일의 코드를 사용하지 않음
+    if (byId('email').value.trim().toLowerCase() !== email) return;
+
+    codeEmail = email;
+    verified = true;
+    byId('status').hidden = false;
+    byId('status').textContent = result.demo_code
+      ? `체험용 인증코드: ${result.demo_code} (5분 동안 유효)`
+      : '이메일로 인증코드를 보냈어요. 5분 안에 입력해주세요.';
+
+    byId('signupCode').focus();
+  } catch (error) {
+    byId('status').hidden = false;
+    byId('status').textContent = error.message;
+  } finally {
+    sendingCode = false;
+    updateVerification();
+  }
 };
+
 byId('onboard').onsubmit = event => {
   event.preventDefault();
-  if (!verified || !byId('job').value) return;
-  draft = {email:byId('email').value.trim().toLowerCase(), job:byId('job').value, years:byId('years').value};
+
+  const email = byId('email').value.trim().toLowerCase();
+  const code = byId('signupCode').value.trim();
+
+  if (
+    !verified ||
+    email !== codeEmail ||
+    !/^[0-9]{6}$/.test(code) ||
+    !byId('job').value ||
+    !byId('agreePrivacy').checked
+  ) return;
+
+  draft = {
+    email,
+    code,
+    job: byId('job').value,
+    years: byId('years').value,
+    agree_privacy: byId('agreePrivacy').checked
+  };
+
   byId('info').close();
-  byId('email').value = '';
-  verified = false;
-  updateVerification();
   select(2);
   show('choose');
 };
+
+
 function welcome() {
   byId('doneAnimal').src = 'assets/characters/' + saved.animal + '.png';
   byId('greeting').textContent = saved.nick + '님, ON-DO에 오신 걸 환영해요!';
@@ -209,17 +414,74 @@ function welcome() {
 }
 byId('shuffle').onclick = recommend;
 byId('nick').oninput = () => byId('nick').setCustomValidity('');
-byId('profile').onsubmit = event => {
+byId('profile').onsubmit = async event => {
   event.preventDefault();
-  const nick = byId('nick').value.trim();
-  if (!nick) {
-    byId('nick').setCustomValidity('닉네임을 입력해주세요.');
-    byId('nick').reportValidity();
+
+  const nickname = byId('nick').value.trim();
+  const submit = byId('profile').querySelector('button.wide');
+
+  if (!nickname || submit.disabled) return;
+
+    // 이미 가입한 사람이 수정하러 들어온 경우 → 가입이 아니라 프로필 수정
+  if (!draft.code) {
+    submit.disabled = true;
+    submit.textContent = '저장 중...';
+    try {
+      const updated = await api('/users/me', {
+        method: 'PATCH',
+        body: { character: CHARACTER_KEYS[animal], nickname }
+      });
+      saved = { ...saved, nick: updated.nickname, animal: CHARACTER_KEYS.indexOf(updated.character) };
+      localStorage.setItem('ondo-profile', JSON.stringify(saved));
+      welcome();
+    } catch (error) {
+      alert(error.message);
+    } finally {
+      submit.disabled = false;
+      submit.textContent = '입력 완료';
+    }
     return;
   }
-  saved = {...draft, animal, nick};
-  localStorage.setItem('ondo-profile', JSON.stringify(saved));
-  welcome();
+
+  submit.disabled = true;
+  submit.textContent = '가입 중...';
+
+  try {
+    await api('/auth/signup', {
+      method: 'POST',
+      auth: false,
+      body: {
+        email: draft.email,
+        code: draft.code,
+        job: draft.job,
+        years: draft.years || null,
+        character: CHARACTER_KEYS[animal],
+        nickname,
+        agree_privacy: draft.agree_privacy
+      }
+    });
+
+    const email = draft.email;
+    draft = {};
+    verified = false;
+    codeEmail = '';
+
+    byId('signupCode').value = '';
+    byId('agreePrivacy').checked = false;
+    byId('status').hidden = true;
+
+    show('home');
+    showAuth('login');
+    byId('loginEmail').value = email;
+    byId('info').showModal();
+
+    alert('회원가입이 완료됐어요! 이어서 로그인해주세요.');
+  } catch (error) {
+    alert(error.message);
+  } finally {
+    submit.disabled = false;
+    submit.textContent = '입력 완료';
+  }
 };
 byId('edit').onclick = () => {
   draft = {email:saved.email, job:saved.job, years:saved.years};
@@ -227,5 +489,6 @@ byId('edit').onclick = () => {
   byId('nick').value = saved.nick;
   show('choose');
 };
-byId('account').onclick = () => {sessionStorage.removeItem('ondo-session');show('home');};
-if (saved && sessionStorage.getItem('ondo-session')) welcome();
+byId('account').onclick = logout;
+
+if (saved && localStorage.getItem('ondo-token') && sessionStorage.getItem('ondo-session')) welcome();

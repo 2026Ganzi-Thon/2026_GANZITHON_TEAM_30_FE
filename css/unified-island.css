@@ -2479,3 +2479,6 @@ dialog .categories {
   pointer-events: auto;
   order: -10;
 }
+
+.reply { white-space: normal; }
+.reply p { white-space: pre-wrap; margin: 4px 0; }

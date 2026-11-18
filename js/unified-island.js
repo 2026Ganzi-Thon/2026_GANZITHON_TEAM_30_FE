@@ -1,7 +1,7 @@
 const el = (id) => document.getElementById(id);
 const me = JSON.parse(localStorage.getItem("ondo-profile") || "null");
-const unifiedFallback = { nick: "나", job: "개발", animal: 0, years: "" };
-const unifiedProfile = me || unifiedFallback;
+if (!me || !localStorage.getItem("ondo-token") || !sessionStorage.getItem("ondo-session"))
+  location.replace("index.html");
 
 const escapeText = (value) =>
   String(value ?? "").replace(
@@ -123,7 +123,7 @@ const samples = [
   x,
   y,
   replies,
-  job: ["개발", "디자인", "마케팅", "기획"][i],
+  job: me?.job,
   time: ["방금", "5분 전", "12분 전", "18분 전"][i],
 }));
 const notices = [
@@ -148,9 +148,13 @@ const themes = [
   ["day", "낮"],
   ["sunset", "노을"],
 ];
-const jobNames = {};
+const jobNames = {
+  디자인: "Design village",
+  개발: "Development village",
+  마케팅: "Marketing village",
+};
 const save = () => localStorage.setItem(key, JSON.stringify(state));
-const own = () => state.posts.filter((p) => p.nick === unifiedProfile.nick);
+const own = () => state.posts.filter((p) => p.job === me.job);
 const repliesFor = (p) => [
   ...(p.replies || []),
   ...(state.replies[p.id] || []),
@@ -220,114 +224,838 @@ function renderTheme() {
     )
     .join("");
 }
-function renderFeed() {
-  const list = [...own().filter((p) => !p.private), ...samples];
-  recentWorryIds = new Set(list.slice(0, 3).map((p) => p.id));
-  const words = tokenise(searchText);
-  const score = (p) =>
-    words.filter((word) =>
-      [p.title, p.body, p.topic].join(" ").toLowerCase().includes(word),
-    ).length;
-  const visible = list.filter(
-    (p) =>
-      (!searchText || score(p) > 0) &&
-      (comfortFilter === "" || p.way === Number(comfortFilter)),
-  );
-  if (searchText) visible.sort((a, b) => score(b) - score(a));
-  el("count").textContent =
-    (activeFilters() ? "조건에 맞는 고민 " : "최근 올라온 고민 ") +
-    visible.length;
+
+let feedRequestId = 0;
+
+async function renderFeed() {
+  const requestId = ++feedRequestId;
+  const query = searchText.trim();
+
   el("reset").hidden = !activeFilters();
-  el("feed").innerHTML =
-    visible
-      .map(
-        (p) => `<button class="card" data-post="${p.id}">
-    <small class="mode">${ways[p.way]} · ${p.time || "방금"}</small><strong>${escapeText(p.title)}</strong>
-    <small>${escapeText(p.nick)} · ${escapeText(p.job)}</small>
-    <small>${escapeText(p.topic)} · 답글 ${repliesFor(p).length}</small></button>`,
-      )
-      .join("") || "<p>조건에 맞는 고민이 없어요.</p>";
-  visiblePins = visible.filter((p) => p.x);
-  renderMarkers();
-}
-const clusterPoint = { x: 31, y: 57 };
-const revealZoom = 2.4;
-function renderMarkers() {
-  const ownPostIds = new Set(state.posts.map((p) => p.id));
-  const myWorry = visiblePins.find((p) => ownPostIds.has(p.id));
-  const otherPins = visiblePins.filter((p) => !ownPostIds.has(p.id));
-  const playerWorry = myWorry
-    ? `<button class="worry-tag player-worry${recentWorryIds.has(myWorry.id) ? " is-new" : ""}" data-post="${myWorry.id}" aria-label="내 고민">${recentWorryIds.has(myWorry.id) ? "" : "● "}고민</button>`
-    : "";
-  const player = `<div class="marker player-marker" style="left:${state.player.x}%;top:${state.player.y}%" aria-label="내 캐릭터 ${escapeText(unifiedProfile.nick)}">
-    ${playerWorry}
-    <img src="${img(unifiedProfile.animal)}" alt="">
-    <span class="player-name">${escapeText(unifiedProfile.nick)}</span>
-  </div>`;
-  if (zoom < revealZoom && otherPins.length > 0) {
-    el("markers").innerHTML =
-      `<button class="marker cluster" style="left:${clusterPoint.x}%;top:${clusterPoint.y}%" data-cluster aria-label="고민 ${otherPins.length}개 확대해서 보기">${otherPins.length}</button>${player}`;
+
+  if (query && (query.length < 2 || query.length > 200)) {
+    el("count").textContent = "검색어를 확인해주세요.";
+    el("feed").textContent = "검색어는 2~200자로 입력해주세요.";
     return;
   }
-  const total = otherPins.length;
-  el("markers").innerHTML =
-    otherPins
-      .map((p, i) => {
-        const angle = i * 2.399963;
-        const radius = total === 1 ? 0 : 3 + Math.sqrt(i) * 2;
-        const x = clusterPoint.x + Math.cos(angle) * radius;
-        const y = clusterPoint.y + Math.sin(angle) * radius * 1.15;
-        const isNew = recentWorryIds.has(p.id);
-        return `<div class="marker author-pin" style="left:${x}%;top:${y}%">
-      <button class="worry-tag${isNew ? " is-new" : ""}" data-post="${p.id}" aria-label="${escapeText(p.nick)}의 고민${isNew ? " · 최근 고민" : ""}">${isNew ? "" : "● "}고민</button>
-      <img src="${img(p.animal)}" alt="${escapeText(p.nick)}의 캐릭터">
-      <span class="author-name">${escapeText(p.nick)}</span>
-    </div>`;
-      })
-      .join("") + player;
+
+  el("count").textContent = "고민을 불러오는 중...";
+  el("feed").textContent = "잠시만 기다려주세요.";
+
+  try {
+    if (!Number.isInteger(islandId) || islandId <= 0) {
+      throw new Error("섬 선택 화면에서 다시 입장해주세요.");
+    }
+
+    let posts;
+    let fallback = null;
+    let hasMore = false;
+
+    if (query) {
+      const params = new URLSearchParams({
+        q: query,
+        island_id: String(islandId),
+        limit: "20"
+      });
+
+      const result = await api(`/search?${params}`);
+      posts = result.items;
+      fallback = result.empty ? result.fallback : null;
+    } else {
+      const params = new URLSearchParams({ limit: "50" });
+
+      if (comfortFilter !== "") {
+        params.set(
+          "comfort_type",
+          COMFORT_KEYS[Number(comfortFilter)]
+        );
+      }
+
+      const result = await api(`/islands/${islandId}/posts?${params}`);
+      posts = result.posts;
+      hasMore = Boolean(result.next_before_id);
+    }
+
+    if (requestId !== feedRequestId) return;
+
+    // 유사 검색 결과에도 선택한 위로 방식 적용
+    if (query && comfortFilter !== "") {
+      posts = posts.filter(
+        post => post.comfort_type === COMFORT_KEYS[Number(comfortFilter)]
+      );
+    }
+
+    recentWorryIds = new Set(posts.slice(0, 3).map(post => post.id));
+
+    el("count").textContent =
+      (query ? "비슷한 고민 " : activeFilters()
+        ? "조건에 맞는 고민 "
+        : "최근 올라온 고민 ") +
+      posts.length + (hasMore ? "+" : "");
+
+    if (fallback) {
+      el("feed").innerHTML = `
+        <p>${escapeText(fallback.message)}</p>
+        <div id="fallbackKeywords" class="row"></div>
+        <button type="button" id="writeFromSearch">
+          이 내용으로 고민 쓰기
+        </button>
+      `;
+
+      for (const keyword of fallback.keywords || []) {
+        const button = document.createElement("button");
+        button.type = "button";
+        button.className = "soft";
+        button.textContent = keyword.label;
+        button.onclick = () => {
+          searchText = el("query").value = keyword.query;
+          renderFeed();
+        };
+        el("fallbackKeywords").append(button);
+      }
+
+      el("writeFromSearch").onclick = () => {
+        editor();
+        el("body").value = fallback.write_prefill?.content || query;
+        updateDraftCounts();
+      };
+
+      return;
+    }
+
+    el("feed").innerHTML = posts.map(post => {
+      const way = COMFORT_KEYS.indexOf(post.comfort_type);
+
+      return `
+        <button class="card" data-post="${post.id}">
+          <small class="mode">
+            ${escapeText(ways[way] || "")} ·
+            ${escapeText(new Date(post.created_at).toLocaleString("ko-KR"))}
+          </small>
+          <strong>${escapeText(post.title)}</strong>
+          <small>${escapeText(post.author?.nickname || "떠난 이용자")}</small>
+          <small>
+            ${escapeText(post.topic)} · 답글 ${post.comment_count}
+          </small>
+        </button>
+      `;
+    }).join("") || (
+      activeFilters()
+        ? "<p>조건에 맞는 고민이 없어요.</p>"
+        : "<p>아직 올라온 고민이 없어요.</p>"
+    );
+  } catch (error) {
+    if (requestId !== feedRequestId) return;
+
+    el("count").textContent = "고민을 불러오지 못했어요.";
+    el("feed").textContent = error.message;
+  }
 }
 
-function showPost(id, open = true) {
-  const p = find(id);
-  if (!p) return;
-  const replies = repliesFor(p);
-  el("detailBody").innerHTML =
-    `<div class="between"><div class="row"><img class="detail-avatar" src="${img(p.animal)}" alt=""><div><strong>${escapeText(p.nick)}</strong><small>${escapeText(p.job)}</small></div></div><button data-close="detail" class="soft">닫기</button></div>
-    <small class="detail-meta">${escapeText(p.topic)} · ${p.private ? "나만보기" : ways[p.way]}</small>
-    <h2 class="detail-title">${escapeText(p.title)}</h2><p class="post-text">${escapeText(p.body)}</p>
-    ${
-      p.private
-        ? ""
-        : `<section class="replies"><h3>함께 건넨 위로 ${replies.length}</h3>
-    ${replies.map(([name, body]) => `<div class="reply"><strong>${escapeText(name)}</strong><br>${escapeText(body)}</div>`).join("")}
-    <form id="replyForm"><label for="reply">따뜻한 위로를 남겨주세요.</label><div class="row"><input id="reply" required maxlength="400" placeholder="답글을 적어주세요"><button>등록</button></div></form></section>`
-    }`;
-  if (!p.private)
-    el("replyForm").onsubmit = (event) => {
-      event.preventDefault();
-      const body = el("reply").value.trim();
-      if (!body) return;
-      (state.replies[id] ??= []).push([unifiedProfile.nick, body]);
-      save();
-      renderFeed();
-      showPost(id, false);
-      el("reply").focus();
-      toast("답글을 남겼어요.");
+const clusterPoint = { x: 31, y: 57 };
+const revealZoom = 2.4;
+const islandId = Number(
+  new URLSearchParams(location.search).get('island_id')
+);
+
+let serverNeighbors = [];
+
+async function loadNeighbors() {
+  try {
+    if (!Number.isInteger(islandId) || islandId <= 0) {
+      throw new Error('섬 선택 화면에서 다시 입장해주세요.');
+    }
+
+    serverNeighbors = await api(`/islands/${islandId}/neighbors`);
+    document.querySelectorAll(".island-counts").forEach(element => {
+      element.textContent = `지도에 표시된 이웃: ${serverNeighbors.length}명`;
+      element.title = "공개 글을 작성한 이웃과 내 캐릭터 기준";
+    });
+    renderMarkers();
+  } catch (error) {
+    toast(error.message);
+  }
+}
+
+function renderMarkers() {
+  const mine = serverNeighbors.find(neighbor => neighbor.is_me);
+  const others = serverNeighbors.filter(neighbor => !neighbor.is_me);
+
+  const player = mine
+    ? `<div
+        class="marker player-marker"
+        style="left:${state.player.x}%;top:${state.player.y}%"
+        aria-label="내 캐릭터 ${escapeText(mine.author.nickname)}"
+      >
+        <img
+          src="${img(CHARACTER_KEYS.indexOf(mine.author.character))}"
+          alt=""
+        >
+        ${mine.latest_post ? `
+          <button
+            type="button"
+            class="worry-tag player-worry"
+            data-post="${mine.latest_post.id}"
+            aria-label="내 최근 고민 보기"
+          >고민</button>
+        ` : ""}
+        <span class="player-name">
+          ${escapeText(mine.author.nickname)}
+        </span>
+      </div>`
+    : '';
+
+  if (zoom < revealZoom && others.length > 0) {
+    el('markers').innerHTML = `
+      <button
+        class="marker cluster"
+        style="left:${clusterPoint.x}%;top:${clusterPoint.y}%"
+        data-cluster
+        aria-label="이웃 ${others.length}명 확대해서 보기"
+      >${others.length}</button>
+      ${player}
+    `;
+    return;
+  }
+
+  el('markers').innerHTML = others.map((neighbor, index) => {
+    const author = neighbor.author;
+    const angle = index * 2.399963;
+    const radius = others.length === 1 ? 0 : 3 + Math.sqrt(index) * 2;
+    const x = clusterPoint.x + Math.cos(angle) * radius;
+    const y = clusterPoint.y + Math.sin(angle) * radius * 1.15;
+
+    return `
+      <div
+        class="marker author-pin"
+        style="left:${x}%;top:${y}%"
+      >
+        <img
+          src="${img(CHARACTER_KEYS.indexOf(author.character))}"
+          alt="${escapeText(author.nickname)}의 캐릭터"
+        >
+
+        ${neighbor.latest_post ? `
+          <button
+            type="button"
+            class="worry-tag"
+            data-post="${neighbor.latest_post.id}"
+            aria-label="${escapeText(author.nickname)}의 최근 고민 보기"
+          >고민</button>
+        ` : ""}
+        <span class="author-name">
+          ${escapeText(author.nickname)}
+        </span>
+      </div>
+    `;
+  }).join('') + player;
+}
+
+let detailRequestId = 0;
+
+async function showPost(id, open = true) {
+  const requestId = ++detailRequestId;
+
+  if (open) {
+    el("detailBody").textContent = "고민을 불러오는 중...";
+    if (!el("detail").open) el("detail").showModal();
+  }
+
+  try {
+    const post = await api(`/posts/${encodeURIComponent(id)}`);
+
+    if (requestId !== detailRequestId) return;
+
+    const author = post.author;
+    const nickname = author?.nickname || "떠난 이용자";
+    const animal = CHARACTER_KEYS.indexOf(author?.character);
+    const way = COMFORT_KEYS.indexOf(post.comfort_type);
+    const comments = post.comments || [];
+
+    el("detailBody").innerHTML = `
+      <div class="between">
+        <div class="row">
+          <img class="detail-avatar" src="${img(animal)}" alt="">
+          <div>
+            <strong>${escapeText(nickname)}</strong>
+            <small>
+              ${escapeText(author?.job || "")}
+              ${escapeText(post.years || "")}
+            </small>
+          </div>
+        </div>
+        <button data-close="detail" class="soft">닫기</button>
+      </div>
+
+      <small class="detail-meta">
+        ${escapeText(post.topic)} ·
+        ${post.visibility === "private"
+          ? "나만보기"
+          : escapeText(ways[way] || "")}
+      </small>
+      
+      ${post.is_mine ? `
+        <div class="row">
+          <button type="button" class="soft" id="editServerPost">
+            수정
+          </button>
+          <button type="button" class="danger" id="deleteServerPost">
+            삭제
+          </button>
+        </div>
+      ` : ""}
+      
+      ${!post.is_mine ? `
+        <button type="button" class="soft" id="reportServerPost">
+          신고
+        </button>
+      ` : ""}
+      ${!post.is_mine && author?.user_id ? `
+        <button type="button" class="soft" id="blockPostAuthor">
+          작성자 차단
+        </button>
+      ` : ""}
+      <h2 class="detail-title">${escapeText(post.title)}</h2>
+      <p class="post-text">${escapeText(post.content)}</p>
+
+      <button
+        type="button"
+        class="soft"
+        id="reactionButton"
+        aria-pressed="${post.reacted_by_me}"
+      >
+        ${post.reacted_by_me ? "♥" : "♡"} 공감 ${post.reaction_count}
+      </button>
+
+      <section class="replies">
+        <h3>함께 건넨 위로 ${
+          comments.filter(comment => !comment.is_deleted).length
+        }</h3>
+
+        ${comments.map(comment => {
+          const name = comment.is_deleted
+            ? ""
+            : comment.is_ai
+              ? "온도 · AI 이웃"
+              : comment.author?.nickname || "떠난 이용자";
+
+          // AI 댓글은 ON-DO 하트, 일반 댓글은 작성자 캐릭터, 삭제된 댓글은 그림 없음
+          const avatar = comment.is_deleted
+            ? ""
+            : comment.is_ai
+              ? "assets/welcome/welcome-heart.png"
+              : img(CHARACTER_KEYS.indexOf(comment.author?.character));
+
+          return `
+            <div class="reply"
+              ${comment.is_deleted ? 'style="color:#888;"' : ""}>
+              <strong>
+                ${avatar ? `<img src="${avatar}" alt="" style="width:24px;height:24px;object-fit:contain;vertical-align:middle;margin-right:6px">` : ""}${escapeText(name)}
+              </strong>
+                <p>${escapeText(comment.content)}</p>
+
+                ${!comment.is_mine && !comment.is_deleted ? `
+                  <button
+                    type="button"
+                    class="soft"
+                    data-report-comment="${comment.id}"
+                  >신고</button>
+                ` : ""}
+
+                ${comment.is_mine && !comment.is_deleted && !comment.is_ai ? `
+                  <button
+                    type="button"
+                    class="soft"
+                    data-delete-comment="${comment.id}"
+                  >삭제</button>
+                ` : ""}
+            </div>
+          `;
+        }).join("")}
+
+        ${post.visibility === "public" ? `
+          <form id="replyForm">
+            <label for="reply">따뜻한 위로를 남겨주세요.</label>
+            <div class="row">
+              <input
+                id="reply"
+                required
+                maxlength="400"
+                placeholder="답글을 적어주세요"
+              >
+              <button>등록</button>
+            </div>
+          </form>
+        ` : ""}
+      </section>
+    `;
+
+    el("detailBody")
+  .querySelectorAll("[data-delete-comment]")
+  .forEach(button => {
+    button.onclick = async () => {
+      if (!confirm("이 댓글을 삭제할까요?")) return;
+
+      button.disabled = true;
+
+      try {
+        await api(
+          `/posts/${post.id}/comments/${button.dataset.deleteComment}`,
+          { method: "DELETE" }
+        );
+
+        await showPost(post.id, false);
+        await renderFeed();
+        toast("댓글을 삭제했어요.");
+      } catch (error) {
+        alert(error.message);
+      } finally {
+        button.disabled = false;
+      }
     };
-  if (open && !el("detail").open) el("detail").showModal();
+  });
+
+    el("reactionButton").onclick = async () => {
+  const button = el("reactionButton");
+  if (button.disabled) return;
+
+  button.disabled = true;
+
+  try {
+    const result = await api(`/posts/${post.id}/reactions`, {
+      method: "POST"
+    });
+
+    button.setAttribute("aria-pressed", String(result.reacted));
+    button.textContent =
+      `${result.reacted ? "♥" : "♡"} 공감 ${result.reaction_count}`;
+  } catch (error) {
+    alert(error.message);
+  } finally {
+    button.disabled = false;
+  }
+};
+
+    if (post.is_mine) {
+  el("editServerPost").onclick = () => {
+    el("detail").close();
+
+    editor({
+      id: post.id,
+      title: post.title,
+      body: post.content,
+      topic: post.topic,
+      way: COMFORT_KEYS.indexOf(post.comfort_type),
+      private: post.visibility === "private",
+      years: post.years || ""
+    });
+  };
+
+  el("deleteServerPost").onclick = async () => {
+    if (!confirm("이 고민을 삭제할까요? 삭제 후에는 복구할 수 없어요.")) {
+      return;
+    }
+
+    const button = el("deleteServerPost");
+    button.disabled = true;
+
+    try {
+      await api(`/posts/${post.id}`, {
+        method: "DELETE"
+      });
+
+      el("detail").close();
+
+      await Promise.all([
+        renderFeed(),
+        loadNeighbors()
+      ]);
+
+      toast("고민을 삭제했어요.");
+    } catch (error) {
+      alert(error.message);
+    } finally {
+      button.disabled = false;
+    }
+  };
 }
-function updateBadge() {
-  const unread = notices.filter((n) => !state.read.includes(n.id)).length;
-  el("badge").textContent = unread;
-  el("badge").hidden = !unread;
+    const reportButton = el("reportServerPost");
+
+if (reportButton) {
+  reportButton.onclick = async () => {
+    const input = prompt("신고 사유를 입력해주세요. (1~200자)");
+    if (input === null) return;
+
+    const reason = input.trim();
+
+    if (!reason || reason.length > 200) {
+      alert("신고 사유는 1~200자로 입력해주세요.");
+      return;
+    }
+
+    reportButton.disabled = true;
+
+    try {
+      await api("/reports", {
+        method: "POST",
+        body: {
+          target_type: "post",
+          target_id: post.id,
+          reason
+        }
+      });
+
+      toast("신고가 접수됐어요.");
+    } catch (error) {
+      alert(error.message);
+    } finally {
+      reportButton.disabled = false;
+    }
+  };
 }
+    const blockButton = el("blockPostAuthor");
+
+if (blockButton) {
+  blockButton.onclick = async () => {
+    if (!confirm(`${nickname}님을 차단할까요? 이 이용자의 글과 댓글이 숨겨져요.`)) {
+      return;
+    }
+
+    blockButton.disabled = true;
+
+    try {
+      await api("/blocks", {
+        method: "POST",
+        body: { user_id: author.user_id }
+      });
+
+      el("detail").close();
+
+      await Promise.all([
+        renderFeed(),
+        loadNeighbors(),
+        updateBadge()
+      ]);
+
+      toast("이용자를 차단했어요.");
+    } catch (error) {
+      alert(error.message);
+    } finally {
+      blockButton.disabled = false;
+    }
+  };
+}
+    el("detailBody")
+  .querySelectorAll("[data-report-comment]")
+  .forEach(button => {
+    button.onclick = async () => {
+      const input = prompt("댓글 신고 사유를 입력해주세요. (1~200자)");
+      if (input === null) return;
+
+      const reason = input.trim();
+
+      if (!reason || reason.length > 200) {
+        alert("신고 사유는 1~200자로 입력해주세요.");
+        return;
+      }
+
+      button.disabled = true;
+
+      try {
+        await api("/reports", {
+          method: "POST",
+          body: {
+            target_type: "comment",
+            target_id: Number(button.dataset.reportComment),
+            reason
+          }
+        });
+
+        toast("댓글 신고가 접수됐어요.");
+      } catch (error) {
+        alert(error.message);
+      } finally {
+        button.disabled = false;
+      }
+    };
+  });
+
+    const form = el("replyForm");
+    if (!form) return;
+
+    form.onsubmit = async event => {
+      event.preventDefault();
+
+      const input = el("reply");
+      const content = input.value.trim();
+      const button = form.querySelector("button");
+
+      if (!content || button.disabled) return;
+
+      button.disabled = true;
+      button.textContent = "등록 중...";
+
+      try {
+        await api(`/posts/${post.id}/comments`, {
+          method: "POST",
+          body: { content }
+        });
+
+        await showPost(post.id, false);
+        await renderFeed();
+        toast("답글을 남겼어요.");
+      } catch (error) {
+        alert(
+          [
+            error.message,
+            error.detail?.suggestion
+          ].filter(Boolean).join("\n\n")
+        );
+      } finally {
+        button.disabled = false;
+        button.textContent = "등록";
+      }
+    };
+  } catch (error) {
+    if (requestId !== detailRequestId) return;
+    el("detailBody").textContent = error.message;
+  }
+}
+
+let serverUnreadCount = 0;
+
+async function updateBadge() {
+  try {
+    const result = await api("/notifications?limit=1");
+
+    serverUnreadCount = result.unread_count;
+    el("badge").textContent = serverUnreadCount;
+    el("badge").hidden = serverUnreadCount === 0;
+  } catch (error) {
+    el("badge").hidden = true;
+    console.error(error.message);
+  }
+}
+
+async function loadMyPosts(selectedTab) {
+  const container = el("myServerPosts");
+  if (!container) return;
+
+  const visibility = selectedTab === "private" ? "private" : "public";
+
+  try {
+    const posts = await api(
+      `/users/me/posts?visibility=${visibility}`
+    );
+
+    // 응답을 기다리는 동안 탭을 바꿨다면 이전 화면을 갱신하지 않음
+    if (
+      el("myServerPosts") !== container ||
+      tab !== selectedTab
+    ) return;
+
+    container.innerHTML = posts.map(post => `
+      <article>
+        <button class="soft" data-post="${post.id}">
+          ${post.has_unread ? "● " : ""}${escapeText(post.title)}
+        </button>
+        <small>
+          ${escapeText(post.topic)} · 답글 ${post.comment_count}
+        </small>
+        <small>
+          ${escapeText(new Date(post.created_at).toLocaleString("ko-KR"))}
+        </small>
+      </article>
+    `).join("") || "<p>작성한 고민이 없어요.</p>";
+  } catch (error) {
+    if (el("myServerPosts") === container) {
+      container.textContent = error.message;
+    }
+  }
+}
+
+async function loadNotifications() {
+  const container = el("serverAlerts");
+  if (!container) return;
+
+  try {
+    const result = await api("/notifications?limit=50");
+
+    if (el("serverAlerts") !== container) return;
+
+    serverUnreadCount = result.unread_count;
+    el("badge").textContent = serverUnreadCount;
+    el("badge").hidden = serverUnreadCount === 0;
+
+    container.innerHTML = result.notifications.map(notification => `
+      <button
+        class="alert-row"
+        data-notification-post="${notification.post_id}"
+      >
+        <span>
+          <strong>${escapeText(notification.post_title)}</strong>
+          <small>
+            ${notification.is_read ? "읽은 알림" : "새 댓글"}
+            · ${escapeText(
+              notification.is_ai
+                ? "온도 · AI 이웃"
+                : notification.actor?.nickname || "떠난 이용자"
+            )}
+          </small>
+          <small>
+            ${escapeText(
+              new Date(notification.created_at).toLocaleString("ko-KR")
+            )}
+          </small>
+        </span>
+        <span aria-hidden="true">›</span>
+      </button>
+    `).join("") || "<p>아직 받은 알림이 없어요.</p>";
+
+    container.querySelectorAll("[data-notification-post]")
+      .forEach(button => {
+        button.onclick = async () => {
+          button.disabled = true;
+
+          try {
+            const postId = Number(button.dataset.notificationPost);
+
+            await api("/notifications/read", {
+              method: "POST",
+              body: { post_id: postId }
+            });
+
+            await showPost(postId);
+            await updateBadge();
+
+            if (el("serverAlerts") === container) {
+              await loadNotifications();
+            }
+          } catch (error) {
+            alert(error.message);
+          } finally {
+            button.disabled = false;
+          }
+        };
+      });
+  } catch (error) {
+    if (el("serverAlerts") === container) {
+      container.textContent = error.message;
+    }
+  }
+}
+
+async function showBlockedUsers() {
+  // 이전 글 상세 요청이 차단 목록을 덮어쓰지 않도록 무효화
+  const requestId = ++detailRequestId;
+  const container = el("detailBody");
+
+  container.textContent = "차단 목록을 불러오는 중...";
+  if (!el("detail").open) el("detail").showModal();
+
+  try {
+    const users = await api("/blocks");
+
+    if (requestId !== detailRequestId) return;
+
+    container.innerHTML = `
+      <div class="between">
+        <h2>차단한 이용자</h2>
+        <button class="soft" data-close="detail">닫기</button>
+      </div>
+
+      ${users.map(user => `
+        <article class="reply">
+          <strong>${escapeText(user.nickname)}</strong>
+          <button
+            type="button"
+            class="soft"
+            data-unblock-user="${user.user_id}"
+          >차단 해제</button>
+        </article>
+      `).join("") || "<p>차단한 이용자가 없어요.</p>"}
+    `;
+
+    container.querySelectorAll("[data-unblock-user]")
+      .forEach(button => {
+        button.onclick = async () => {
+          if (!confirm("이 이용자의 차단을 해제할까요?")) return;
+
+          button.disabled = true;
+
+          try {
+            await api(`/blocks/${button.dataset.unblockUser}`, {
+              method: "DELETE"
+            });
+
+            await Promise.all([
+              renderFeed(),
+              loadNeighbors(),
+              updateBadge()
+            ]);
+
+            if (requestId === detailRequestId && el("detail").open) {
+              await showBlockedUsers();
+            }
+
+            toast("차단을 해제했어요.");
+          } catch (error) {
+            alert(error.message);
+          } finally {
+            button.disabled = false;
+          }
+        };
+      });
+  } catch (error) {
+    if (requestId === detailRequestId) {
+      container.textContent = error.message;
+    }
+  }
+}
+
+async function loadMyComments() {
+  const container = el("myServerComments");
+  if (!container) return;
+
+  try {
+    const comments = await api("/users/me/comments");
+
+    if (el("myServerComments") !== container) return;
+
+    container.innerHTML = comments.map(comment => `
+      <article class="reply">
+        <button
+          type="button"
+          class="soft"
+          ${comment.post_id === null
+            ? "disabled"
+            : `data-post="${comment.post_id}"`}
+        >
+          ${escapeText(comment.post_title)}
+        </button>
+        <p>${escapeText(comment.content)}</p>
+        <small>
+          ${escapeText(
+            new Date(comment.created_at).toLocaleString("ko-KR")
+          )}
+        </small>
+      </article>
+    `).join("") || "<p>아직 작성한 댓글이 없어요.</p>";
+  } catch (error) {
+    if (el("myServerComments") === container) {
+      container.textContent = error.message;
+    }
+  }
+}
+
 function personal(detail = null) {
   const section = el("personal");
-  const unread = notices.filter((n) => !state.read.includes(n.id)).length;
+  const unread = serverUnreadCount;
   const tabs = [
     ["alerts", unread ? "댓글 알림 " + unread : "댓글 알림"],
     ["private", "나만보기"],
     ["own", "내 고민"],
+    ["comments", "내 댓글"],
     ["settings", "캐릭터 설정"],
   ];
   const heading = detail
@@ -340,65 +1068,158 @@ function personal(detail = null) {
   let content;
   if (detail) {
     content = `<article><strong>${escapeText(detail.title)}</strong><small>${escapeText(detail.name)}</small><p>${escapeText(detail.body)}</p></article><div class="row"><button data-tab="alerts" class="soft">← 알림 목록</button></div>`;
-  } else if (tab === "alerts") {
-    content = notices
-      .map(
-        (n) => `<button data-alert="${n.id}" class="alert-row">
-      <span><strong>${escapeText(n.title)}</strong><small>${state.read.includes(n.id) ? "읽은 예시 댓글" : "새 댓글이 달렸어요"} · ${n.time}</small></span><span aria-hidden="true">›</span>
-    </button>`,
-      )
-      .join("");
-  } else if (tab === "settings") {
+    } else if (tab === "alerts") {
+    content = '<div id="serverAlerts">알림을 불러오는 중...</div>';
+  }else if (tab === "comments") {
+  content = '<div id="myServerComments">내 댓글을 불러오는 중...</div>';
+  }  else if (tab === "settings") {
     content = `<form id="profileSettings" class="profile-settings">
-      <label for="profileNick">닉네임</label><input id="profileNick" maxlength="18" required value="${escapeText(unifiedProfile.nick)}">
-      <strong>캐릭터</strong><div class="profile-character-grid">${characterNames.map((name, index) => `<button type="button" data-profile-animal="${index}" aria-label="${name}" aria-pressed="${index === unifiedProfile.animal}"><img src="${img(index)}" alt=""><span>${name}</span></button>`).join("")}</div>
+      <label for="profileNick">닉네임</label><input id="profileNick" maxlength="18" required value="${escapeText(me.nick)}">
+      <strong>캐릭터</strong><div class="profile-character-grid">${characterNames.map((name, index) => `<button type="button" data-profile-animal="${index}" aria-label="${name}" aria-pressed="${index === me.animal}"><img src="${img(index)}" alt=""><span>${name}</span></button>`).join("")}</div>
       <button class="wide">변경사항 저장</button></form>`;
   } else {
-    content =
-      own()
-        .filter((p) => p.private === (tab === "private"))
-        .map(
-          (p) => `<article>
-      <button class="soft" data-post="${p.id}">${escapeText(p.title)}</button><small>${escapeText(p.topic)} · 답글 ${repliesFor(p).length}</small>
-      <div class="row"><button data-edit="${p.id}" class="soft">수정</button><button data-delete="${p.id}" class="danger">삭제</button></div></article>`,
-        )
-        .join("") || "<p>작성한 고민이 없어요.</p>";
+    content = '<div id="myServerPosts">내 고민을 불러오는 중...</div>';
   }
   section.innerHTML = `<div class="between"><h3>${heading}</h3><button id="hideProfile" class="soft">닫기</button></div>
     ${detail ? "" : '<div class="row personal-tabs">' + tabs.map(([id, label]) => `<button data-tab="${id}" ${id === tab ? "" : 'class="soft"'} aria-pressed="${id === tab}">${label}</button>`).join("") + "</div>"}${content}`;
   if (!detail && tab === "settings") setupProfileSettings(section);
+  if (!detail && (tab === "own" || tab === "private")) {
+    loadMyPosts(tab);
+  }
+  if (!detail && tab === "alerts") {
+  loadNotifications();
 }
+  const logoutButton = document.createElement("button");
+logoutButton.type = "button";
+logoutButton.className = "soft";
+logoutButton.textContent = "로그아웃";
+
+logoutButton.onclick = () => {
+  logoutButton.disabled = true;
+  logout();
+};
+
+const blocksButton = document.createElement("button");
+blocksButton.type = "button";
+blocksButton.className = "soft";
+blocksButton.textContent = "차단한 이용자";
+blocksButton.onclick = showBlockedUsers;
+
+section.append(blocksButton);
+section.append(logoutButton);
+if (!detail && tab === "comments") {
+  loadMyComments();
+}
+}
+
 function setupProfileSettings(section) {
-  let selectedAnimal = unifiedProfile.animal;
+  let selectedAnimal = me.animal;
+  let requestId = 0;
+  let saving = false;
+
+  const form = el("profileSettings");
+  const nick = el("profileNick");
+  const submit = form.querySelector("button.wide");
   const buttons = [...section.querySelectorAll("[data-profile-animal]")];
-  for (const button of buttons) button.onclick = () => {
-    selectedAnimal = Number(button.dataset.profileAnimal);
-    for (const choice of buttons) choice.setAttribute("aria-pressed", String(choice === button));
-  };
-  el("profileSettings").onsubmit = (event) => {
-    event.preventDefault();
-    const nick = el("profileNick").value.trim();
-    if (!nick) return el("profileNick").reportValidity();
-    const oldNick = unifiedProfile.nick;
-    for (const post of state.posts) if (post.nick === oldNick) { post.nick = nick; post.animal = selectedAnimal; }
-    for (const replies of Object.values(state.replies)) for (const reply of replies) if (reply[0] === oldNick) reply[0] = nick;
-    unifiedProfile.nick = nick;
-    unifiedProfile.animal = selectedAnimal;
-    localStorage.setItem("ondo-profile", JSON.stringify(unifiedProfile));
-    const villageState = JSON.parse(localStorage.getItem("ondo-village-v1") || "null");
-    if (villageState) {
-      for (const post of villageState.posts || []) if (post.nick === oldNick) { post.nick = nick; post.animal = selectedAnimal; }
-      for (const replies of Object.values(villageState.replies || {})) for (const reply of replies) if (reply[0] === oldNick) reply[0] = nick;
-      localStorage.setItem("ondo-village-v1", JSON.stringify(villageState));
+
+  nick.readOnly = true;
+  nick.maxLength = 40;
+
+  const shuffle = document.createElement("button");
+  shuffle.type = "button";
+  shuffle.className = "soft";
+  shuffle.textContent = "다시 뽑기";
+  nick.after(shuffle);
+
+  async function recommendProfileNickname() {
+    if (saving) return;
+
+    const currentRequest = ++requestId;
+    submit.disabled = true;
+    nick.value = "";
+    nick.placeholder = "닉네임을 추천받고 있어요...";
+
+    try {
+      const result = await api(
+        `/auth/nickname?character=${CHARACTER_KEYS[selectedAnimal]}`,
+        { auth: false }
+      );
+
+      if (currentRequest !== requestId) return;
+
+      nick.value = result.nickname;
+      submit.disabled = false;
+    } catch (error) {
+      if (currentRequest !== requestId) return;
+
+      nick.placeholder = "다시 뽑기를 눌러주세요.";
+      alert(error.message);
     }
-    save();
-    el("myName").textContent = unifiedProfile.nick;
-    el("avatar").src = img(unifiedProfile.animal);
-    renderFeed();
-    personal();
-    toast("캐릭터와 닉네임을 변경했어요.");
+  }
+
+  shuffle.onclick = recommendProfileNickname;
+
+  for (const button of buttons) {
+    button.onclick = () => {
+      if (saving) return;
+
+      selectedAnimal = Number(button.dataset.profileAnimal);
+
+      for (const choice of buttons) {
+        choice.setAttribute("aria-pressed", String(choice === button));
+      }
+
+      recommendProfileNickname();
+    };
+  }
+
+  form.onsubmit = async event => {
+    event.preventDefault();
+    if (saving || submit.disabled || !nick.value.trim()) return;
+
+    saving = true;
+    submit.disabled = true;
+    shuffle.disabled = true;
+    submit.textContent = "저장 중...";
+
+    try {
+      const updated = await api("/users/me", {
+        method: "PATCH",
+        body: {
+          character: CHARACTER_KEYS[selectedAnimal],
+          nickname: nick.value.trim()
+        }
+      });
+
+      me.nick = updated.nickname;
+      me.animal = CHARACTER_KEYS.indexOf(updated.character);
+
+      localStorage.setItem("ondo-profile", JSON.stringify(me));
+
+      el("myName").textContent = me.nick;
+      el("avatar").src = img(me.animal);
+
+      await Promise.all([
+        renderFeed(),
+        loadNeighbors()
+      ]);
+
+      if (section.isConnected && tab === "settings") {
+        personal();
+      }
+
+      toast("캐릭터와 닉네임을 변경했어요.");
+    } catch (error) {
+      alert(error.message);
+    } finally {
+      saving = false;
+      submit.disabled = false;
+      shuffle.disabled = false;
+      submit.textContent = "변경사항 저장";
+    }
   };
 }
+
 function closeProfile() {
   el("personal").hidden = true;
   el("profile").setAttribute("aria-expanded", "false");
@@ -472,18 +1293,13 @@ function editor(p = null) {
   updateDraftCounts();
   el("editor").show();
 }
-if (unifiedProfile) {
+if (me && sessionStorage.getItem("ondo-session")) {
   const heading = el("villageName");
   heading.textContent = "통합섬";
-  const koreanJob = { 디자인: "디자이너", 개발: "개발자", 마케팅: "마케터" }[
-    unifiedProfile.job
-  ];
-  el("zoomVillageName").textContent = koreanJob
-    ? heading.textContent
-    : heading.textContent;
+  el("zoomVillageName").textContent = "통합섬";
   heading.classList.toggle("long-name", heading.textContent.length > 15);
-  el("myName").textContent = unifiedProfile.nick;
-  el("avatar").src = img(unifiedProfile.animal);
+  el("myName").textContent = me.nick;
+  el("avatar").src = img(me.animal);
 
   setupCategories();
   el("comfort").innerHTML = ways
@@ -541,6 +1357,7 @@ if (unifiedProfile) {
   });
   const reviewDialog = el("reviewDialog");
   let pendingDraft = null;
+  let serverReview = null; // 서버(BE)가 422 NEED_EDIT로 돌려준 점검 결과
   let originalIssues = new Map();
   function showReviewResults(showResults) {
     el("suggestionPanel").hidden = showResults;
@@ -561,10 +1378,8 @@ if (unifiedProfile) {
     row.querySelector("button").focus();
   };
   let resumeDraft = false;
-  el("yearsVisibility").hidden = !unifiedProfile.years;
-  el("yearsPreview").textContent = unifiedProfile.years
-    ? unifiedProfile.job + " · " + unifiedProfile.years
-    : "";
+  el("yearsVisibility").hidden = !me.years;
+  el("yearsPreview").textContent = me.years ? me.job + " · " + me.years : "";
   for (const field of ["postTitle", "body"])
     el(field).oninput = () => {
       el(field).setCustomValidity("");
@@ -597,6 +1412,7 @@ if (unifiedProfile) {
     ]) {
       el(id).oninput = (event) => {
         pendingDraft[field] = event.target.value;
+        serverReview = null; // 글을 고치면 서버 결과는 지우고 다시 게시해서 확인
         renderReview();
       };
     }
@@ -617,8 +1433,10 @@ if (unifiedProfile) {
       !pendingDraft.body.trim() ||
       pendingDraft.title.length > 40 ||
       pendingDraft.body.length > 1000;
-    el("publishPost").disabled = Boolean(issues.length || incomplete);
-    el("reviewStatus").textContent = issues.length
+    el("publishPost").disabled = Boolean(issues.length || incomplete || serverReview);
+    el("reviewStatus").textContent = serverReview
+      ? "서버 점검에서 수정이 필요한 표현이 발견됐어요. 표시된 부분을 고쳐 주세요."
+      : issues.length
       ? "필수 수정 " + issues.length + "개 항목이 남았어요."
       : incomplete
         ? "제목과 본문 길이를 확인해 주세요."
@@ -626,8 +1444,16 @@ if (unifiedProfile) {
     const highlight = (field) => {
       let cursor = 0;
       let html = "";
+      // 서버가 알려 준 문제 구절도 같은 방식으로 하이라이트
+      const serverHits = (serverReview?.issues || [])
+        .filter((issue) => issue.text)
+        .flatMap((issue) =>
+          [...pendingDraft[field].matchAll(new RegExp(issue.text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "g"))]
+            .map((m) => ({ field, text: m[0], index: m.index })),
+        );
       const hits = issues
         .flatMap((c) => c.matches)
+        .concat(serverHits)
         .filter((m) => m.field === field)
         .sort((a, b) => a.index - b.index);
       for (const hit of hits) {
@@ -669,7 +1495,18 @@ if (unifiedProfile) {
       "건 반영 · 남은 필수 " +
       issues.length +
       "건";
-    el("reviewResults").innerHTML = checks
+    const serverBlock = serverReview
+      ? `<div class="review-result check-row pending">
+        <div class="between"><strong><span class="check-icon" aria-hidden="true">!</span>AI 서버 점검</strong><small class="review-badge required">수정 필요</small></div>
+        <small class="check-excerpt">${escapeText(
+          [...new Set((serverReview.issues || []).map((i) => i.text).filter(Boolean))].join(", ") ||
+            "문제 구절 위치를 찾지 못했어요",
+        )}</small>
+        <p>${escapeText(serverReview.reason || "")}</p>
+        <p>${escapeText(serverReview.suggestion || "")}</p>
+      </div>`
+      : "";
+    el("reviewResults").innerHTML = serverBlock + checks
       .map((c) => {
         const status = c.matches.length
           ? c.note
@@ -707,6 +1544,7 @@ if (unifiedProfile) {
   el("reviewSuggestions").onclick = (event) => {
     const button = event.target.closest("[data-rule]");
     if (!button || !pendingDraft) return;
+    serverReview = null;
     pendingDraft = applyReviewRule(
       pendingDraft,
       reviewRules[Number(button.dataset.rule)],
@@ -742,10 +1580,10 @@ if (unifiedProfile) {
     }
     const p = {
       id: editing || "post-" + Date.now(),
-      nick: unifiedProfile.nick,
-      animal: unifiedProfile.animal,
-      job: unifiedProfile.job,
-      years: el("shareYears").checked ? unifiedProfile.years : "",
+      nick: me.nick,
+      animal: me.animal,
+      job: me.job,
+      years: el("shareYears").checked ? me.years : "",
       x: 50,
       y: 55,
       title: el("postTitle").value.trim(),
@@ -761,6 +1599,7 @@ if (unifiedProfile) {
       return;
     }
     pendingDraft = p;
+    serverReview = null;
     originalIssues = new Map();
     showReviewResults(true);
     resumeDraft = true;
@@ -769,38 +1608,106 @@ if (unifiedProfile) {
     renderReview();
     reviewDialog.showModal();
   };
-  el("publishPost").onclick = () => {
-    if (!pendingDraft) return;
-    const p = {
-      ...pendingDraft,
-      title: pendingDraft.title.trim(),
-      body: pendingDraft.body.trim(),
-    };
-    if (
-      el("publishPost").disabled ||
-      inspectDraft(p).some((c) => c.replacement && c.matches.length)
+  
+  el("publishPost").onclick = async () => {
+  if (!pendingDraft) return;
+
+  const button = el("publishPost");
+  if (button.disabled) return;
+
+  const p = {
+    ...pendingDraft,
+    title: pendingDraft.title.trim(),
+    body: pendingDraft.body.trim()
+  };
+
+  if (
+    inspectDraft(p).some(
+      check => check.replacement && check.matches.length
     )
-      return;
+  ) return;
+
+  const originalText = button.textContent;
+  button.disabled = true;
+  button.textContent = "저장 중...";
+
+  try {
+    const body = {
+      title: p.title,
+      content: p.body,
+      topic: p.topic,
+      comfort_type: COMFORT_KEYS[p.way],
+      visibility: p.private ? "private" : "public",
+      show_years: Boolean(p.years)
+    };
+
+    const isEditing = editing !== null;
+
+    if (!isEditing) {
+      body.island_id = islandId;
+    }
+
+    const result = await api(
+      isEditing ? `/posts/${editing}` : "/posts",
+      {
+        method: isEditing ? "PATCH" : "POST",
+        body
+      }
+    );
+
+    // 저장 성공 후에만 작성 내용을 비움
     resumeDraft = false;
     pendingDraft = null;
-    const previous = state.posts.findIndex((post) => post.id === editing);
-    if (previous < 0) state.posts.unshift(p);
-    else state.posts[previous] = p;
-    save();
+    editing = null;
     reviewDialog.close();
-    renderFeed();
-    if (!el("personal").hidden) {
-      tab = p.private ? "private" : "own";
-      personal();
-    }
+
+    await Promise.all([
+      renderFeed(),
+      loadNeighbors()
+    ]);
+
     toast(
-      previous < 0
-        ? p.private
+      isEditing
+        ? "수정했어요."
+        : p.private
           ? "나만보기로 저장했어요."
           : "고민을 나눴어요."
-        : "수정했어요.",
     );
-  };
+
+    if (result?.crisis_support) {
+      const support = result.crisis_support;
+
+      alert(
+        [
+          support.message,
+          ...(support.resources || []).map(resource =>
+            typeof resource === "string"
+              ? resource
+              : Object.values(resource)
+                  .filter(value => typeof value === "string")
+                  .join(" · ")
+          )
+        ].filter(Boolean).join("\n\n")
+      );
+    }
+  } catch (error) {
+    const detail = error.detail;
+
+    if (error.status === 422 && detail?.code === "NEED_EDIT") {
+      // 팝업 대신 오른쪽 점검 패널에 서버 결과를 표시
+      serverReview = detail;
+      showReviewResults(true);
+      el("resultHeading").focus();
+    } else {
+      alert(error.message);
+    }
+  } finally {
+    button.textContent = originalText;
+    if (pendingDraft) renderReview(); // 버튼 활성 여부를 점검 결과에 맞춰 다시 계산
+    else button.disabled = false;
+  }
+};
+
   el("deleteDialog").onclose = () => {
     if (el("deleteDialog").returnValue !== "delete" || !deleting) return;
     state.posts = state.posts.filter((p) => p.id !== deleting);
@@ -1042,4 +1949,5 @@ if (unifiedProfile) {
   renderTheme();
   updateBadge();
   renderFeed();
+  loadNeighbors();
 }
