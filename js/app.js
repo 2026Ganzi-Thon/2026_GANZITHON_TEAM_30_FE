@@ -172,6 +172,9 @@ let verificationTimer;
 let resendUntil = 0;
 let sendingCode = false;
 let codeEmail = '';
+let codeVerified = false;
+let verifyingCode = false;
+let codeVerificationRequest = 0;
 
 function updateVerification() {
   const email = byId('email').value.trim().toLowerCase();
@@ -193,6 +196,8 @@ function updateVerification() {
 
   byId('continue').disabled =
     !verified ||
+    !codeVerified ||
+    verifyingCode ||
     email !== codeEmail ||
     !/^[0-9]{6}$/.test(byId('signupCode').value.trim()) ||
     !byId('job').value ||
@@ -201,13 +206,61 @@ function updateVerification() {
 
 byId('email').oninput = () => {
   verified = false;
+  codeVerified = false;
+  verifyingCode = false;
+  codeVerificationRequest++;
   codeEmail = '';
   byId('signupCode').value = '';
   byId('status').hidden = true;
   updateVerification();
 };
 
-byId('signupCode').oninput = updateVerification;
+async function verifySignupCode() {
+  const email = byId('email').value.trim().toLowerCase();
+  const code = byId('signupCode').value.trim();
+
+  if (!verified || email !== codeEmail || !/^[0-9]{6}$/.test(code)) return;
+
+  const requestId = ++codeVerificationRequest;
+  verifyingCode = true;
+  codeVerified = false;
+  byId('status').hidden = false;
+  byId('status').textContent = '인증코드를 확인하고 있어요.';
+  updateVerification();
+
+  try {
+    await api('/auth/email-code/verify', {
+      method: 'POST',
+      auth: false,
+      body: { email, purpose: 'signup', code }
+    });
+
+    if (
+      requestId !== codeVerificationRequest ||
+      byId('email').value.trim().toLowerCase() !== email ||
+      byId('signupCode').value.trim() !== code
+    ) return;
+
+    codeVerified = true;
+    byId('status').textContent = '인증코드가 확인됐어요.';
+  } catch (error) {
+    if (requestId !== codeVerificationRequest) return;
+    byId('status').textContent = error.message;
+  } finally {
+    if (requestId === codeVerificationRequest) {
+      verifyingCode = false;
+      updateVerification();
+    }
+  }
+}
+
+byId('signupCode').oninput = () => {
+  codeVerified = false;
+  verifyingCode = false;
+  codeVerificationRequest++;
+  updateVerification();
+  verifySignupCode();
+};
 byId('agreePrivacy').onchange = updateVerification;
 
 byId('showLogin').onclick = () => showAuth('login');
@@ -280,6 +333,25 @@ byId('loginSendCode').onclick = async () => {
   }
 };
 
+async function saveLoginSession(accessToken) {
+  localStorage.setItem('ondo-token', accessToken);
+
+  const me = await api('/auth/me');
+
+  // 기존 화면이 사용하는 이름으로 변환해 보관
+  saved = {
+    id: me.id,
+    email: me.email,
+    job: me.job,
+    years: me.years || '',
+    nick: me.nickname,
+    animal: CHARACTER_KEYS.indexOf(me.character)
+  };
+
+  localStorage.setItem('ondo-profile', JSON.stringify(saved));
+  sessionStorage.setItem('ondo-session', '1');
+}
+
 byId('loginForm').onsubmit = async event => {
   event.preventDefault();
 
@@ -299,22 +371,7 @@ byId('loginForm').onsubmit = async event => {
       }
     });
 
-    localStorage.setItem('ondo-token', result.access_token);
-
-    const me = await api('/auth/me');
-
-    // 기존 화면이 사용하는 이름으로 변환해 보관
-    saved = {
-      id: me.id,
-      email: me.email,
-      job: me.job,
-      years: me.years || '',
-      nick: me.nickname,
-      animal: CHARACTER_KEYS.indexOf(me.character)
-    };
-
-    localStorage.setItem('ondo-profile', JSON.stringify(saved));
-    sessionStorage.setItem('ondo-session', '1');
+    await saveLoginSession(result.access_token);
 
     location.href = 'island-select.html';
   } catch (error) {
@@ -332,6 +389,9 @@ byId('verify').onclick = async () => {
 
   sendingCode = true;
   verified = false;
+  codeVerified = false;
+  verifyingCode = false;
+  codeVerificationRequest++;
   codeEmail = '';
   byId('signupCode').value = '';
   byId('status').hidden = false;
@@ -385,6 +445,7 @@ byId('onboard').onsubmit = event => {
 
   if (
     !verified ||
+    !codeVerified ||
     email !== codeEmail ||
     !/^[0-9]{6}$/.test(code) ||
     !byId('job').value ||
@@ -447,7 +508,7 @@ byId('profile').onsubmit = async event => {
   submit.textContent = '가입 중...';
 
   try {
-    await api('/auth/signup', {
+    const result = await api('/auth/signup', {
       method: 'POST',
       auth: false,
       body: {
@@ -461,21 +522,18 @@ byId('profile').onsubmit = async event => {
       }
     });
 
-    const email = draft.email;
+    await saveLoginSession(result.access_token);
+
     draft = {};
     verified = false;
+    codeVerified = false;
     codeEmail = '';
 
     byId('signupCode').value = '';
     byId('agreePrivacy').checked = false;
     byId('status').hidden = true;
 
-    show('home');
-    showAuth('login');
-    byId('loginEmail').value = email;
-    byId('info').showModal();
-
-    alert('회원가입이 완료됐어요! 이어서 로그인해주세요.');
+    location.href = 'island-select.html';
   } catch (error) {
     alert(error.message);
   } finally {

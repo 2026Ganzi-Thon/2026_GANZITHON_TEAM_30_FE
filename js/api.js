@@ -1,28 +1,44 @@
-const API = 'http://localhost:8000';
+const API = "https://ondo-api.onrender.com";
 
 const CHARACTER_KEYS = [
-  'rat', 'ox', 'tiger', 'rabbit', 'dragon', 'snake', 'horse',
-  'sheep', 'monkey', 'rooster', 'dog', 'pig', 'lion'
+  "rat",
+  "ox",
+  "tiger",
+  "rabbit",
+  "dragon",
+  "snake",
+  "horse",
+  "sheep",
+  "monkey",
+  "rooster",
+  "dog",
+  "pig",
+  "lion",
 ];
 
-const COMFORT_KEYS = ['empathy', 'experience', 'opinion'];
+const COMFORT_KEYS = ["empathy", "experience", "opinion"];
 
 function errorText(detail) {
   if (Array.isArray(detail)) {
-    return detail.map(item => item.msg).join('\n');
+    const messages = detail
+      .map((item) =>
+        typeof item === "string" ? item : item?.msg || item?.message,
+      )
+      .filter(Boolean);
+    return messages.join("\n") || "입력한 내용을 다시 확인해주세요.";
   }
 
-  if (typeof detail === 'string') return detail;
+  if (typeof detail === "string") return detail;
 
-  return detail?.reason || detail?.message || '요청 처리에 실패했어요.';
+  return detail?.reason || detail?.message || "요청 처리에 실패했어요.";
 }
 
-async function api(path, { method = 'GET', body, auth = true } = {}) {
+async function api(path, { method = "GET", body, auth = true } = {}) {
   const headers = {};
-  const token = localStorage.getItem('ondo-token');
+  const token = localStorage.getItem("ondo-token");
 
   if (body !== undefined) {
-    headers['Content-Type'] = 'application/json';
+    headers["Content-Type"] = "application/json";
   }
 
   if (auth && token) {
@@ -35,18 +51,20 @@ async function api(path, { method = 'GET', body, auth = true } = {}) {
     response = await fetch(API + path, {
       method,
       headers,
-      body: body === undefined ? undefined : JSON.stringify(body)
+      body: body === undefined ? undefined : JSON.stringify(body),
     });
   } catch {
-    throw new Error('서버에 연결할 수 없어요. 백엔드가 켜져 있는지 확인해주세요.');
+    throw new Error(
+      "서버에 연결할 수 없어요. 백엔드가 켜져 있는지 확인해주세요.",
+    );
   }
 
   if (response.status === 401 && auth) {
-    localStorage.removeItem('ondo-token');
-    localStorage.removeItem('ondo-profile');
-    sessionStorage.removeItem('ondo-session');
-    location.href = 'index.html';
-    throw new Error('로그인이 만료됐어요. 다시 로그인해주세요.');
+    localStorage.removeItem("ondo-token");
+    localStorage.removeItem("ondo-profile");
+    sessionStorage.removeItem("ondo-session");
+    location.href = "index.html";
+    throw new Error("로그인이 만료됐어요. 다시 로그인해주세요.");
   }
 
   if (response.status === 204) return null;
