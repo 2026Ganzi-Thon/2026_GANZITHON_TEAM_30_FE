@@ -2,14 +2,14 @@
 <html lang="ko">
 <head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>ON-DO 통합섬</title><link rel="stylesheet" href="css/unified-island.css?v=20261117-003"><script defer src="js/review.js"></script><script defer src="js/unified-island.js?v=20261117-003"></script>
+<title>ON-DO 통합섬</title><link rel="stylesheet" href="css/unified-island.css?v=20261117-003"><script defer src="js/api.js"></script><script defer src="js/review.js"></script><script defer src="js/unified-island.js?v=20261117-003"></script>
 </head>
 <body>
 <main class="village">
 <div id="map" class="map" aria-label="통합섬 지도"><div id="world" class="world"><img id="land" src="assets/village/village-day.webp" alt=""><div id="markers"></div></div></div>
 <header class="identity">
-<div class="glass title"><h1 id="villageName">통합섬</h1><small id="people" class="island-counts" title="체험 모드 예시 수치"><span>총 이웃: 100</span><span>접속 중: 10</span></small></div>
-<div id="zoomIdentity" class="glass zoom-identity" hidden><time id="zoomTime"></time><strong id="zoomVillageName"></strong><small class="island-counts" title="체험 모드 예시 수치"><span>총 이웃: 100</span><span>접속 중: 10</span></small></div>
+<div class="glass title"><h1 id="villageName">통합섬</h1><small id="people" class="island-counts" title="공개 글을 작성한 이웃과 내 캐릭터 기준"><span>이웃을 불러오는 중...</span></small></div>
+<div id="zoomIdentity" class="glass zoom-identity" hidden><time id="zoomTime"></time><strong id="zoomVillageName"></strong><small class="island-counts" title="공개 글을 작성한 이웃과 내 캐릭터 기준"><span>이웃을 불러오는 중...</span></small></div>
 <button id="profile" class="profile" aria-expanded="false"><img id="avatar" alt=""><span><strong id="myName"></strong><small>내 프로필</small></span><b id="badge"></b><i aria-hidden="true">⌄</i></button>
 <section id="personal" class="paper personal" hidden aria-label="내 프로필 메뉴"></section>
 </header>

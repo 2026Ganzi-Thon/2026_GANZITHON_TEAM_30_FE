@@ -34,7 +34,8 @@
 </div>
 <form id="profile" class="nickname">
 <label for="nick" class="visually-hidden">익명 닉네임</label>
-<div class="nickrow"><input id="nick" required maxlength="18"><button type="button" id="shuffle">다시 추첨하기</button></div>
+<div class="nickrow"><input id="nick" required readonly maxlength="40">
+<button type="button" id="shuffle">다시 추첨하기</button></div>
 <p>고민글과 댓글에 표시될 닉네임이에요!</p>
 <button class="wide">입력 완료</button>
 </form>
@@ -46,13 +47,40 @@
 <div class="welcome-banner">WELCOME TO ON-DO</div>
 <button class="close" id="close" aria-label="닫기">×</button>
 <div class="auth-tabs" role="tablist" aria-label="계정 메뉴"><button type="button" id="showLogin" role="tab">로그인</button><button type="button" id="showSignup" role="tab">회원가입</button></div>
+
 <form id="loginForm" aria-labelledby="loginTitle">
-<h2 id="loginTitle">다시 만나서 반가워요</h2>
-<label for="loginEmail">회사 이메일</label>
-<input id="loginEmail" type="email" required placeholder="인증했던 회사 이메일을 입력해주세요" autocomplete="email">
-<p id="loginStatus" class="status" aria-live="polite"></p>
-<button class="wide">로그인</button>
+  <h2 id="loginTitle">다시 만나서 반가워요</h2>
+
+  <label for="loginEmail">회사 이메일</label>
+  <input
+    id="loginEmail"
+    type="email"
+    required
+    placeholder="가입한 이메일을 입력해주세요"
+    autocomplete="email"
+  >
+
+  <button type="button" class="wide" id="loginSendCode">
+    로그인 인증코드 받기
+  </button>
+
+  <p id="loginStatus" class="status" aria-live="polite"></p>
+
+  <label for="loginCode">이메일 인증코드</label>
+  <input
+    id="loginCode"
+    type="text"
+    inputmode="numeric"
+    autocomplete="one-time-code"
+    pattern="[0-9]{6}"
+    maxlength="6"
+    required
+    placeholder="6자리 인증코드를 입력해주세요"
+  >
+
+  <button class="wide" id="loginSubmit">로그인</button>
 </form>
+
 <h2 id="infoTitle">ON-DO에서 사용할 정보를 알려주세요</h2>
 <form id="onboard">
 <label for="email">직장인 인증</label>
@@ -64,18 +92,39 @@
 <ul><li>직무는 해당 섬을 연결하는 데 쓰여요. 연차 공개 여부는 글을 쓸 때 선택할 수 있어요.</li>
 <li>글과 댓글에는 닉네임이 표시되며, 실명과 회사명은 저장하지 않아요.</li>
 <li>고민 분야는 같은 주제의 글을 모아 보여드리는 데 사용돼요.</li></ul>
-<details><summary>개인정보 처리 안내</summary><p>체험용 로그인 확인을 위해 이메일은 이 브라우저에만 저장되며 외부로 전송하지 않아요.</p></details>
+<details><summary>개인정보 처리 안내</summary><p>이메일은 회원가입·로그인 인증과 계정 관리에 사용되며 서버로 전송됩니다. 다른 사용자에게는 공개되지 않아요.</p></details>
 </div>
 <button type="button" class="wide" id="verify" disabled>인증 메일 받기</button>
 <p class="status" id="status" aria-live="polite" hidden></p>
+<label for="signupCode">이메일 인증코드</label>
+<input
+  id="signupCode"
+  type="text"
+  inputmode="numeric"
+  autocomplete="one-time-code"
+  pattern="[0-9]{6}"
+  maxlength="6"
+  placeholder="6자리 인증코드를 입력해주세요"
+  required
+>
 <div class="fields">
 <div><span id="jobLabel" class="field-label">직무</span><select id="job" hidden><option value="">선택해주세요</option><option value="디자인">디자이너</option><option>영업</option><option value="개발">개발 · 엔지니어링</option></select></div>
 <div><span id="yearsLabel" class="field-label">연차</span><select id="years" hidden><option value="">선택 안 함</option><option>1년 미만</option><option>1~3년</option><option>4~6년</option><option>7~10년</option><option>11년 이상</option></select></div>
 </div>
+<label style="display:flex;align-items:center;gap:8px;margin:16px 0;">
+  <input
+    id="agreePrivacy"
+    type="checkbox"
+    required
+    style="width:auto;margin:0;"
+  >
+  <span>개인정보 수집 및 이용에 동의합니다. (필수)</span>
+</label>
 <button class="wide" id="continue" disabled>완료하였습니다</button>
 </form>
 </div>
 </dialog>
+<script src="js/api.js"></script>
 <script src="js/app.js?v=20261116-1900"></script>
 </body>
 </html>

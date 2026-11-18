@@ -1,10 +1,7 @@
 /* 메인 선택 화면 전용 상태. 팀 로그인 화면의 ondo-profile 값은 읽기만 합니다. */
 const islandSelectStoredProfile = JSON.parse(localStorage.getItem('ondo-profile') || 'null');
 const islandSelectProfile = islandSelectStoredProfile || { job: '개발', nick: '게스트', animal: 0, years: '' };
-const islandSelectItems = [
-  { kind: 'unified', name: '통합섬', path: 'unified-island.html' },
-  { kind: 'job', name: `${islandSelectProfile.job}섬`, path: 'village.html' },
-];
+let islandSelectItems = [];
 
 const islandSelectJobMessages = {
   디자인: '디자이너 이웃들의 이야기를 만나요.',
@@ -44,7 +41,9 @@ function islandSelectShowPreview(item) {
       if (!islandSelectStoredProfile) localStorage.setItem('ondo-profile', JSON.stringify(islandSelectProfile));
       sessionStorage.setItem('ondo-session', '1');
     }
-    location.assign(item.path);
+    location.assign(
+      `${item.path}?island_id=${encodeURIComponent(item.id)}`
+    );
   };
 }
 
@@ -79,4 +78,46 @@ function islandSelectMove(delta) {
 
 document.getElementById('island-select-prev').onclick = () => islandSelectMove(-1);
 document.getElementById('island-select-next').onclick = () => islandSelectMove(1);
-islandSelectRender();
+async function loadIslandSelect() {
+  const previous = document.getElementById('island-select-prev');
+  const next = document.getElementById('island-select-next');
+
+  previous.disabled = true;
+  next.disabled = true;
+  islandSelectSubtitle.textContent = '섬 목록을 불러오고 있어요.';
+
+  if (!localStorage.getItem('ondo-token')) {
+    location.replace('index.html');
+    return;
+  }
+
+  try {
+    const islands = await api('/islands');
+
+    islandSelectItems = islands.map(island => ({
+      id: island.id,
+      kind: island.type === 'common' ? 'unified' : 'job',
+      name: island.name,
+      path: island.type === 'common'
+        ? 'unified-island.html'
+        : 'village.html'
+    }));
+
+    // 기존 화면처럼 통합섬을 먼저 표시
+    islandSelectItems.sort(
+      (a, b) => Number(a.kind === 'job') - Number(b.kind === 'job')
+    );
+
+    if (!islandSelectItems.length) {
+      islandSelectSubtitle.textContent = '입장할 수 있는 섬이 없어요.';
+      return;
+    }
+
+    islandSelectIndex = 0;
+    islandSelectRender();
+  } catch (error) {
+    islandSelectSubtitle.textContent = error.message;
+  }
+}
+
+loadIslandSelect();
