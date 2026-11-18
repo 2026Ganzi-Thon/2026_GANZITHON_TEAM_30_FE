@@ -1358,7 +1358,45 @@ if (me && sessionStorage.getItem("ondo-session")) {
   const reviewDialog = el("reviewDialog");
   let pendingDraft = null;
   let serverReview = null; // 서버(BE)가 422 NEED_EDIT로 돌려준 점검 결과
-  let originalIssues = new Map();
+  let reviewLoading = false;
+  let reviewError = "";
+  let reviewRequest = 0;
+  let reviewTimer;
+  async function checkPost(requestId) {
+    try {
+      const result = await api("/posts/check", {
+        method: "POST",
+        body: {
+          title: pendingDraft.title,
+          content: pendingDraft.body,
+        },
+      });
+      if (requestId !== reviewRequest) return;
+      serverReview = result;
+    } catch (error) {
+      if (requestId !== reviewRequest) return;
+      reviewError = "서버 점검에 실패했어요. 그래도 게시할 수 있어요.";
+    } finally {
+      if (requestId === reviewRequest) {
+        reviewLoading = false;
+        renderReview();
+      }
+    }
+  }
+  function schedulePostCheck(delay = 350) {
+    clearTimeout(reviewTimer);
+    const requestId = ++reviewRequest;
+    serverReview = null;
+    reviewError = "";
+    if (!pendingDraft || pendingDraft.private) {
+      reviewLoading = false;
+      renderReview();
+      return;
+    }
+    reviewLoading = true;
+    renderReview();
+    reviewTimer = setTimeout(() => checkPost(requestId), delay);
+  }
   function showReviewResults(showResults) {
     el("suggestionPanel").hidden = showResults;
     el("resultPanel").hidden = !showResults;
@@ -1366,16 +1404,6 @@ if (me && sessionStorage.getItem("ondo-session")) {
   el("showResults").onclick = () => {
     showReviewResults(true);
     el("resultHeading").focus();
-  };
-  el("reviewResults").onclick = (event) => {
-    const button = event.target.closest("[data-suggestion]");
-    if (!button) return;
-    showReviewResults(false);
-    const row = el("reviewSuggestions")
-      .querySelector('[data-rule="' + button.dataset.suggestion + '"]')
-      .closest(".review-result");
-    row.classList.add("selected-suggestion");
-    row.querySelector("button").focus();
   };
   let resumeDraft = false;
   el("yearsVisibility").hidden = !me.years;
@@ -1412,52 +1440,66 @@ if (me && sessionStorage.getItem("ondo-session")) {
     ]) {
       el(id).oninput = (event) => {
         pendingDraft[field] = event.target.value;
-        serverReview = null; // 글을 고치면 서버 결과는 지우고 다시 게시해서 확인
-        renderReview();
+        schedulePostCheck();
       };
     }
   }
   function renderReview() {
-    const checks = inspectDraft(pendingDraft);
-    const issues = checks.filter(
-      (check) => check.replacement && check.matches.length,
-    );
-    checks
-      .filter((c) => c.matches.length)
-      .forEach((c) => {
-        if (!originalIssues.has(c.label))
-          originalIssues.set(c.label, c.matches[0].text);
-      });
     const incomplete =
       !pendingDraft.title.trim() ||
       !pendingDraft.body.trim() ||
       pendingDraft.title.length > 40 ||
       pendingDraft.body.length > 1000;
-    el("publishPost").disabled = Boolean(issues.length || incomplete || serverReview);
-    el("reviewStatus").textContent = serverReview
-      ? "서버 점검에서 수정이 필요한 표현이 발견됐어요. 표시된 부분을 고쳐 주세요."
-      : issues.length
-      ? "필수 수정 " + issues.length + "개 항목이 남았어요."
+    const blocked = serverReview?.ok === false;
+    el("publishPost").disabled = Boolean(incomplete || reviewLoading || blocked);
+    el("reviewStatus").textContent = pendingDraft.private
+      ? "나만보기 글은 검사 없이 게시할 수 있어요."
       : incomplete
         ? "제목과 본문 길이를 확인해 주세요."
-        : "필수 점검을 통과했어요. 게시할 수 있어요.";
+        : reviewLoading
+          ? "서버에서 게시 전 점검을 진행하고 있어요."
+          : reviewError
+            ? reviewError
+            : blocked
+              ? "서버 점검에서 수정이 필요한 표현이 발견됐어요."
+              : serverReview?.ok
+                ? "서버 점검을 통과했어요. 게시할 수 있어요."
+                : "게시 전 점검을 준비하고 있어요.";
+
+    const issueHits = (field) => {
+      const hits = [];
+      const titleLength = pendingDraft.title.length;
+      for (const issue of serverReview?.issues || []) {
+        const start = issue.start;
+        const end = issue.end;
+        if (Number.isInteger(start) && Number.isInteger(end) && end > start) {
+          if (field === "title" && start >= 0 && end <= titleLength) {
+            hits.push({ index: start, text: pendingDraft.title.slice(start, end) });
+            continue;
+          }
+          if (field === "body" && start > titleLength) {
+            const bodyStart = start - titleLength - 1;
+            const bodyEnd = end - titleLength - 1;
+            if (bodyStart >= 0 && bodyEnd <= pendingDraft.body.length) {
+              hits.push({ index: bodyStart, text: pendingDraft.body.slice(bodyStart, bodyEnd) });
+              continue;
+            }
+          }
+        }
+        if (!issue.text) continue;
+        let index = pendingDraft[field].indexOf(issue.text);
+        while (index !== -1) {
+          hits.push({ index, text: issue.text });
+          index = pendingDraft[field].indexOf(issue.text, index + issue.text.length);
+        }
+      }
+      return hits.sort((a, b) => a.index - b.index);
+    };
     const highlight = (field) => {
       let cursor = 0;
       let html = "";
-      // 서버가 알려 준 문제 구절도 같은 방식으로 하이라이트
-      const serverHits = (serverReview?.issues || [])
-        .filter((issue) => issue.text)
-        .flatMap((issue) =>
-          [...pendingDraft[field].matchAll(new RegExp(issue.text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "g"))]
-            .map((m) => ({ field, text: m[0], index: m.index })),
-        );
-      const hits = issues
-        .flatMap((c) => c.matches)
-        .concat(serverHits)
-        .filter((m) => m.field === field)
-        .sort((a, b) => a.index - b.index);
-      for (const hit of hits) {
-        if (hit.index < cursor) continue;
+      for (const hit of issueHits(field)) {
+        if (hit.index < cursor || !hit.text) continue;
         html +=
           escapeText(pendingDraft[field].slice(cursor, hit.index)) +
           "<mark>" +
@@ -1471,90 +1513,41 @@ if (me && sessionStorage.getItem("ondo-session")) {
       ["title", "reviewDraftTitle", "reviewTitleHighlight"],
       ["body", "reviewDraftBody", "reviewBodyHighlight"],
     ]) {
-      if (el(input).value !== pendingDraft[field])
-        el(input).value = pendingDraft[field];
-      el(mirror).innerHTML =
-        highlight(field) + (field === "body" ? "&#8203;" : "");
+      if (el(input).value !== pendingDraft[field]) el(input).value = pendingDraft[field];
+      el(mirror).innerHTML = highlight(field) + (field === "body" ? "&#8203;" : "");
     }
     el("reviewTitleCount").textContent = pendingDraft.title.length + " / 40";
-    const resolved = checks.filter(
-      (c) => c.replacement && !c.matches.length && originalIssues.has(c.label),
-    ).length;
-    el("reviewResultSummary").textContent =
-      checks.length +
-      "개 항목 점검 · 필수 " +
-      (resolved + issues.length) +
-      "건 중 " +
-      resolved +
-      "건 반영";
-    el("reviewSuggestionSummary").textContent =
-      resolved +
-      issues.length +
-      "건 중 " +
-      resolved +
-      "건 반영 · 남은 필수 " +
-      issues.length +
-      "건";
-    const serverBlock = serverReview
-      ? `<div class="review-result check-row pending">
-        <div class="between"><strong><span class="check-icon" aria-hidden="true">!</span>AI 서버 점검</strong><small class="review-badge required">수정 필요</small></div>
-        <small class="check-excerpt">${escapeText(
-          [...new Set((serverReview.issues || []).map((i) => i.text).filter(Boolean))].join(", ") ||
-            "문제 구절 위치를 찾지 못했어요",
-        )}</small>
-        <p>${escapeText(serverReview.reason || "")}</p>
-        <p>${escapeText(serverReview.suggestion || "")}</p>
-      </div>`
-      : "";
-    el("reviewResults").innerHTML = serverBlock + checks
-      .map((c) => {
-        const status = c.matches.length
-          ? c.note
-            ? "안내"
-            : "수정 필요"
-          : originalIssues.has(c.label)
-            ? "반영 완료"
-            : "통과";
-        const needsChange = status === "수정 필요";
-        const excerpt = c.matches[0]?.text ?? originalIssues.get(c.label);
-        const badge = needsChange
-          ? `<button type="button" class="review-badge required" data-suggestion="${checks.indexOf(c)}" aria-label="${c.label} 수정 필요">수정 필요</button>`
-          : `<small class="review-badge">${status}</small>`;
-        return `<div class="review-result check-row ${needsChange ? "pending" : ""}">
-        <div class="between"><strong><span class="check-icon" aria-hidden="true">${needsChange ? "!" : "✓"}</span>${c.label}</strong>${badge}</div>
-        <small class="check-excerpt">${excerpt ? escapeText(excerpt) + (c.matches.length ? " · " + c.matches.length + "곳" : "") : "발견된 표현 없음"}</small>
-        ${c.note && c.matches.length ? "<p>" + c.note + "</p>" : ""}
-      </div>`;
-      })
-      .join("");
-    el("reviewSuggestions").innerHTML =
-      checks
-        .filter((check) => check.replacement && originalIssues.has(check.label))
-        .map((check, index) => {
-          const before =
-            check.matches[0]?.text ?? originalIssues.get(check.label);
-          const done = !check.matches.length;
-          return `<div class="review-result ${done ? "applied" : "pending"}">
-        <div class="between"><strong><span class="review-number">${index + 1}</span> <span class="review-badge ${done ? "" : "required"}">필수</span> ${check.action}</strong><button type="button" data-rule="${checks.indexOf(check)}" ${done ? "disabled" : ""}>✓ ${done ? "적용됨" : "적용하기"}</button></div>
-        <del>${escapeText(before)}</del><small>↵ ${escapeText(before.replace(check.pattern, check.replacement))}</small>
-      </div>`;
-        })
-        .join("") || '<p class="review-note">남은 필수 수정 사항이 없어요.</p>';
+
+    const issues = serverReview?.issues || [];
+    el("reviewResultSummary").textContent = reviewLoading
+      ? "서버 응답을 기다리는 중"
+      : serverReview
+        ? `서버 점검 완료 · 문제 표현 ${issues.length}건`
+        : reviewError || (pendingDraft.private ? "나만보기는 점검하지 않음" : "점검 결과 없음");
+    el("reviewSuggestionSummary").textContent = serverReview?.suggestion || "";
+
+    if (reviewLoading) {
+      el("reviewResults").innerHTML = '<p class="review-note">게시할 수 있는 글인지 확인하고 있어요.</p>';
+    } else if (reviewError) {
+      el("reviewResults").innerHTML = `<p class="review-note">${escapeText(reviewError)}</p>`;
+    } else if (serverReview) {
+      const issueRows = issues.map((issue) => `<div class="review-result check-row ${blocked ? "pending" : ""}">
+        <div class="between"><strong><span class="check-icon" aria-hidden="true">${blocked ? "!" : "✓"}</span>${escapeText(issue.type || "문제 표현")}</strong><small class="review-badge ${blocked ? "required" : ""}">${blocked ? "수정 필요" : "안내"}</small></div>
+        <small class="check-excerpt">${escapeText(issue.text || "문제 구절 위치를 찾지 못했어요")}</small>
+        ${issue.guide ? `<p>${escapeText(issue.guide)}</p>` : ""}
+      </div>`).join("");
+      el("reviewResults").innerHTML = blocked
+        ? `<div class="review-result check-row pending"><p>${escapeText(serverReview.reason || "수정이 필요한 표현이 있어요.")}</p><p>${escapeText(serverReview.suggestion || "")}</p></div>${issueRows}`
+        : `<div class="review-result check-row"><strong><span class="check-icon" aria-hidden="true">✓</span>서버 점검 통과</strong></div>${issueRows}`;
+    } else {
+      el("reviewResults").innerHTML = `<p class="review-note">${pendingDraft.private ? "나만보기 글은 검사하지 않아요." : "점검 결과가 없어요."}</p>`;
+    }
+
+    const guides = issues.map((issue) => issue.guide).filter(Boolean);
+    el("reviewSuggestions").innerHTML = serverReview?.suggestion || guides.length
+      ? `<div class="review-result"><p>${escapeText(serverReview?.suggestion || "")}</p>${guides.map((guide) => `<small>${escapeText(guide)}</small>`).join("")}</div>`
+      : '<p class="review-note">수정 제안이 없어요.</p>';
   }
-  el("reviewSuggestions").onclick = (event) => {
-    const button = event.target.closest("[data-rule]");
-    if (!button || !pendingDraft) return;
-    serverReview = null;
-    pendingDraft = applyReviewRule(
-      pendingDraft,
-      reviewRules[Number(button.dataset.rule)],
-    );
-    renderReview();
-    (
-      el("reviewSuggestions").querySelector("button:not(:disabled)") ||
-      (el("publishPost").disabled ? el("reviewDraftTitle") : el("publishPost"))
-    ).focus();
-  };
   el("closeReview").onclick = () => reviewDialog.close();
   reviewDialog.onclose = () => {
     if (!resumeDraft || !pendingDraft) return;
@@ -1600,13 +1593,12 @@ if (me && sessionStorage.getItem("ondo-session")) {
     }
     pendingDraft = p;
     serverReview = null;
-    originalIssues = new Map();
     showReviewResults(true);
     resumeDraft = true;
     el("editor").close();
     setupReviewDraft();
-    renderReview();
     reviewDialog.showModal();
+    schedulePostCheck(0);
   };
   
   el("publishPost").onclick = async () => {
@@ -1620,12 +1612,6 @@ if (me && sessionStorage.getItem("ondo-session")) {
     title: pendingDraft.title.trim(),
     body: pendingDraft.body.trim()
   };
-
-  if (
-    inspectDraft(p).some(
-      check => check.replacement && check.matches.length
-    )
-  ) return;
 
   const originalText = button.textContent;
   button.disabled = true;
@@ -1695,7 +1681,11 @@ if (me && sessionStorage.getItem("ondo-session")) {
 
     if (error.status === 422 && detail?.code === "NEED_EDIT") {
       // 팝업 대신 오른쪽 점검 패널에 서버 결과를 표시
-      serverReview = detail;
+      clearTimeout(reviewTimer);
+      reviewRequest++;
+      reviewLoading = false;
+      reviewError = "";
+      serverReview = { ...detail, ok: false };
       showReviewResults(true);
       el("resultHeading").focus();
     } else {
