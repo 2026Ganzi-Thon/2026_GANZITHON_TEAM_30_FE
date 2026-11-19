@@ -8,15 +8,14 @@ const adjectives = [
 ];
 const nicknameHistory = new Map();
 let animal = 2, verified = false, draft = {};
-let saved = JSON.parse(localStorage.getItem('ondo-profile') || 'null');
+let saved = loadProfile();
+// 'login' = 이메일로 시작하기 화면, 'signup' = 처음 온 사람의 직무·동의 화면 (이메일 인증은 이미 끝난 상태)
 function showAuth(mode) {
   const login = mode === 'login';
   byId('loginForm').hidden = !login;
   byId('infoTitle').hidden = login;
   byId('onboard').hidden = login;
-  byId('showLogin').setAttribute('aria-selected', String(login));
-  byId('showSignup').setAttribute('aria-selected', String(!login));
-  byId('loginStatus').textContent = '';
+  if (login) byId('loginStatus').textContent = '';
 }
 function show(view) {
   for (const id of ['home','choose','done']) byId(id).hidden = id !== view;
@@ -98,6 +97,11 @@ function select(index, refreshNick = true) {
     cards.append(card);
   }
   byId('animalName').textContent = names[animal];
+  // 12간지 × 위로 성향: 이 캐릭터로 댓글을 달면 붙는 칭호
+  const persona = personaOf(CHARACTER_KEYS[animal]);
+  byId('animalPersona').textContent = persona
+    ? `${persona.icon} ${persona.label} · 댓글에 이 칭호가 함께 보여요`
+    : '';
   if (refreshNick) recommend();
 }
 byId('previous').onclick = () => select(animal - 1);
@@ -263,9 +267,7 @@ byId('signupCode').oninput = () => {
 };
 byId('agreePrivacy').onchange = updateVerification;
 
-byId('showLogin').onclick = () => showAuth('login');
-byId('showSignup').onclick = () => showAuth('signup');
-byId('start').onclick = () => { updateVerification(); showAuth(saved ? 'login' : 'signup'); byId('info').showModal(); };
+byId('start').onclick = () => { updateVerification(); showAuth('login'); byId('info').showModal(); };
 byId('close').onclick = () => byId('info').close();
 let loginResendUntil = 0;
 let loginCodeTimer;
@@ -282,16 +284,39 @@ function updateLoginCodeButton() {
     ? '요청 중...'
     : remaining > 0
       ? `재전송 (${remaining}초)`
-      : '로그인 인증코드 받기';
+      : '인증코드 받기';
 }
+
+// /auth/start 결과: 처음 온 이메일인지 (코드를 받은 이메일 기준)
+let startState = null;
 
 byId('loginEmail').oninput = () => {
   byId('loginCode').value = '';
   byId('loginStatus').textContent = '';
+  startState = null;
 };
 
-byId('loginSendCode').onclick = async () => {
-  if (!byId('loginEmail').reportValidity()) return;
+// 성공하면 서버 응답을, 실패하면 null을 돌려줌 (체험 계정 버튼에서 재사용)
+// /auth/start가 없는 이전 서버면 예전 방식(로그인 코드 → 없으면 가입 코드)으로 같은 결과를 만듦
+async function requestStartCode(email) {
+  try {
+    return await api('/auth/start', { method: 'POST', auth: false, body: { email } });
+  } catch (error) {
+    const missingRoute = (error.status === 404 && error.message === 'Not Found') || error.status === 405;
+    if (!missingRoute) throw error;
+  }
+  try {
+    const sent = await api('/auth/email-code', { method: 'POST', auth: false, body: { email, purpose: 'login' } });
+    return { ...sent, is_new: false };
+  } catch (error) {
+    if (error.status !== 404) throw error;
+    const sent = await api('/auth/email-code', { method: 'POST', auth: false, body: { email, purpose: 'signup' } });
+    return { ...sent, is_new: true };
+  }
+}
+
+async function requestLoginCode() {
+  if (!byId('loginEmail').reportValidity()) return null;
 
   const email = byId('loginEmail').value.trim().toLowerCase();
 
@@ -301,40 +326,44 @@ byId('loginSendCode').onclick = async () => {
   updateLoginCodeButton();
 
   try {
-    const result = await api('/auth/email-code', {
-      method: 'POST',
-      auth: false,
-      body: { email, purpose: 'login' }
-    });
+    // 가입했는지는 서버가 판단: 처음이면 가입 코드, 이미 있으면 로그인 코드를 보냄
+    const result = await requestStartCode(email);
 
-    loginResendUntil = Date.now() + result.resend_after * 1000;
+    startLoginCooldown(result.resend_after);
 
-    clearInterval(loginCodeTimer);
-    loginCodeTimer = setInterval(() => {
-      updateLoginCodeButton();
+    if (byId('loginEmail').value.trim().toLowerCase() !== email) return null;
+    startState = { email, isNew: result.is_new };
 
-      if (Date.now() >= loginResendUntil) {
-        clearInterval(loginCodeTimer);
-      }
-    }, 1000);
-
-    if (byId('loginEmail').value.trim().toLowerCase() !== email) return;
-
-    byId('loginStatus').textContent = result.demo_code
+    const greeting = result.is_new ? '처음 오셨네요! ' : '다시 만나서 반가워요. ';
+    byId('loginStatus').textContent = greeting + (result.demo_code
       ? `체험용 인증코드: ${result.demo_code} (5분 동안 유효)`
-      : '이메일로 인증코드를 보냈어요.';
+      : '이메일로 인증코드를 보냈어요.');
 
     byId('loginCode').focus();
+    return result;
   } catch (error) {
+    // 503(EMAIL_UNAVAILABLE) 등은 안내 문구만 보여 주고 코드 입력칸으로 넘어가지 않음
     byId('loginStatus').textContent = error.message;
+    if (error.retryAfter) startLoginCooldown(error.retryAfter);
+    return null;
   } finally {
     loginSending = false;
     updateLoginCodeButton();
   }
-};
+}
+byId('loginSendCode').onclick = requestLoginCode;
 
-async function saveLoginSession(accessToken) {
-  localStorage.setItem('ondo-token', accessToken);
+function startLoginCooldown(seconds) {
+  loginResendUntil = Date.now() + seconds * 1000;
+  clearInterval(loginCodeTimer);
+  loginCodeTimer = setInterval(() => {
+    updateLoginCodeButton();
+    if (Date.now() >= loginResendUntil) clearInterval(loginCodeTimer);
+  }, 1000);
+}
+
+async function saveLoginSession(accessToken, remember = false) {
+  startAuth(accessToken, remember);
 
   const me = await api('/auth/me');
 
@@ -345,11 +374,11 @@ async function saveLoginSession(accessToken) {
     job: me.job,
     years: me.years || '',
     nick: me.nickname,
-    animal: CHARACTER_KEYS.indexOf(me.character)
+    animal: CHARACTER_KEYS.indexOf(me.character),
+    color: me.color || 'original'
   };
 
-  localStorage.setItem('ondo-profile', JSON.stringify(saved));
-  sessionStorage.setItem('ondo-session', '1');
+  saveProfile(saved);
 }
 
 byId('loginForm').onsubmit = async event => {
@@ -358,29 +387,64 @@ byId('loginForm').onsubmit = async event => {
   const submit = byId('loginSubmit');
   if (submit.disabled) return;
 
+  const email = byId('loginEmail').value.trim().toLowerCase();
+  const code = byId('loginCode').value.trim();
+  const remember = byId('rememberMe').checked;
+
+  if (!startState || startState.email !== email) {
+    byId('loginStatus').textContent = '먼저 인증코드를 받아 주세요.';
+    return;
+  }
+
   submit.disabled = true;
-  submit.textContent = '로그인 중...';
+  submit.textContent = '확인 중...';
 
   try {
+    if (startState.isNew) {
+      // 처음 온 사람: 코드만 확인하고 직무·캐릭터 고르기로 (가입은 마지막에 같은 코드로)
+      await api('/auth/email-code/verify', {
+        method: 'POST',
+        auth: false,
+        body: { email, purpose: 'signup', code }
+      });
+      startSignup(email, code, remember);
+      return;
+    }
+
     const result = await api('/auth/login', {
       method: 'POST',
       auth: false,
-      body: {
-        email: byId('loginEmail').value.trim().toLowerCase(),
-        code: byId('loginCode').value.trim()
-      }
+      body: { email, code, remember }
     });
 
-    await saveLoginSession(result.access_token);
+    await saveLoginSession(result.access_token, remember);
 
     location.href = 'island-select.html';
   } catch (error) {
     byId('loginStatus').textContent = error.message;
   } finally {
     submit.disabled = false;
-    submit.textContent = '로그인';
+    submit.textContent = '시작하기';
   }
 };
+
+// 이메일 인증을 마친 새 사용자: 가입 화면의 이메일·코드 칸은 채워서 숨기고 직무·동의만 받음
+let signupRemember = false;
+function startSignup(email, code, remember) {
+  signupRemember = remember;
+  byId('email').value = email;
+  byId('signupCode').value = code;
+  codeEmail = email;
+  verified = true;
+  codeVerified = true;
+  verifyingCode = false;
+  document.querySelectorAll('.signup-email').forEach(part => { part.hidden = true; });
+  byId('startVerified').hidden = false;
+  byId('startVerified').textContent = `${email} 인증을 마쳤어요. 직무를 고르면 섬에 초대돼요.`;
+  showAuth('signup');
+  updateVerification();
+  byId('job').focus();
+}
 
 byId('verify').onclick = async () => {
   if (!byId('email').reportValidity()) return;
@@ -431,6 +495,14 @@ byId('verify').onclick = async () => {
   } catch (error) {
     byId('status').hidden = false;
     byId('status').textContent = error.message;
+    if (error.retryAfter) {
+      resendUntil = Date.now() + error.retryAfter * 1000;
+      clearInterval(verificationTimer);
+      verificationTimer = setInterval(() => {
+        updateVerification();
+        if (Date.now() >= resendUntil) clearInterval(verificationTimer);
+      }, 1000);
+    }
   } finally {
     sendingCode = false;
     updateVerification();
@@ -457,7 +529,8 @@ byId('onboard').onsubmit = event => {
     code,
     job: byId('job').value,
     years: byId('years').value,
-    agree_privacy: byId('agreePrivacy').checked
+    agree_privacy: byId('agreePrivacy').checked,
+    remember: signupRemember
   };
 
   byId('info').close();
@@ -493,7 +566,7 @@ byId('profile').onsubmit = async event => {
         body: { character: CHARACTER_KEYS[animal], nickname }
       });
       saved = { ...saved, nick: updated.nickname, animal: CHARACTER_KEYS.indexOf(updated.character) };
-      localStorage.setItem('ondo-profile', JSON.stringify(saved));
+      saveProfile(saved);
       welcome();
     } catch (error) {
       alert(error.message);
@@ -518,11 +591,12 @@ byId('profile').onsubmit = async event => {
         years: draft.years || null,
         character: CHARACTER_KEYS[animal],
         nickname,
-        agree_privacy: draft.agree_privacy
+        agree_privacy: draft.agree_privacy,
+        remember: Boolean(draft.remember)
       }
     });
 
-    await saveLoginSession(result.access_token);
+    await saveLoginSession(result.access_token, Boolean(draft.remember));
 
     draft = {};
     verified = false;
@@ -549,4 +623,31 @@ byId('edit').onclick = () => {
 };
 byId('account').onclick = logout;
 
-if (saved && localStorage.getItem('ondo-token') && sessionStorage.getItem('ondo-session')) welcome();
+// 심사위원용: 체험 계정으로 코드 요청 → 코드 입력 → 로그인까지 자동 진행
+byId('demoLogin').onclick = async () => {
+  const button = byId('demoLogin');
+  button.disabled = true;
+  byId('loginEmail').value = 'demo@example.com';
+  try {
+    const result = await requestLoginCode();
+    if (!result?.demo_code) return;
+    byId('loginCode').value = result.demo_code;
+    byId('loginForm').requestSubmit();
+  } finally {
+    button.disabled = false;
+  }
+};
+
+// 무료 서버는 잠들어 있을 수 있으니 첫 화면에서 미리 깨움 (결과는 무시)
+(function wakeServer() {
+  const status = byId('wakeStatus');
+  const showTimer = setTimeout(() => { status.hidden = false; }, 800);
+  fetch(API + '/health')
+    .catch(() => {})
+    .finally(() => {
+      clearTimeout(showTimer);
+      status.hidden = true;
+    });
+})();
+
+if (saved && authToken()) welcome();

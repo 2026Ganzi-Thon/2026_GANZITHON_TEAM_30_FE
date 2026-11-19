@@ -711,3 +711,51 @@ nav {
   margin: 0;
   color: #9a3f32;
 }
+#loginForm .demo-login {
+  background: transparent;
+  color: #28553f;
+  border: 1px solid #28553f;
+}
+.wake-status {
+  margin: 10px 0 0;
+  text-align: center;
+  color: #5d6f66;
+  font-size: 14px;
+}
+.animal-persona {
+  margin: 4px 0 0;
+  text-align: center;
+  color: #3e6555;
+  font-weight: 700;
+  font-size: 14px;
+}
+
+/* 이메일로 시작하기 */
+.start-intro {
+  margin: 0 0 12px;
+  color: #4d6a5d;
+  font-size: 14px;
+  line-height: 1.5;
+}
+.remember {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 12px 0;
+  cursor: pointer;
+}
+.remember input {
+  width: auto;
+  margin: 0;
+}
+.remember small {
+  color: #6b7d74;
+}
+.start-verified {
+  margin: 0 0 12px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: #e5f4ea;
+  color: #24594f;
+  font-weight: 700;
+}

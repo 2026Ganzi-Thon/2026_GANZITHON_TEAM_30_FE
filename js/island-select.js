@@ -1,5 +1,5 @@
 /* 메인 선택 화면 전용 상태. 팀 로그인 화면의 ondo-profile 값은 읽기만 합니다. */
-const islandSelectStoredProfile = JSON.parse(localStorage.getItem('ondo-profile') || 'null');
+const islandSelectStoredProfile = loadProfile();
 const islandSelectProfile = islandSelectStoredProfile || { job: '개발', nick: '게스트', animal: 0, years: '' };
 let islandSelectItems = [];
 
@@ -38,7 +38,7 @@ function islandSelectShowPreview(item) {
   document.getElementById('island-select-back').onclick = islandSelectRender;
   document.getElementById('island-select-browse').onclick = () => {
     if (item.kind === 'job') {
-      if (!islandSelectStoredProfile) localStorage.setItem('ondo-profile', JSON.stringify(islandSelectProfile));
+      if (!islandSelectStoredProfile) saveProfile(islandSelectProfile);
       sessionStorage.setItem('ondo-session', '1');
     }
     location.assign(
@@ -61,12 +61,34 @@ function islandSelectRender() {
     <div class="island-select-copy">
       <h2>${item.name}</h2>
       <p>${item.kind === 'unified' ? '다양한 직무의 이웃들과 고민을 나눠요.' : islandSelectPreviewMessage(item)}</p>
+      <p class="island-select-status" id="island-select-status" aria-live="polite"></p>
       <button class="island-select-enter" id="island-select-enter">${item.name} 입장하기</button>
     </div>
   `;
   document.getElementById('island-select-prev').disabled = islandSelectIndex === 0;
   document.getElementById('island-select-next').disabled = islandSelectIndex === islandSelectItems.length - 1;
   document.getElementById('island-select-enter').onclick = () => islandSelectShowPreview(item);
+  islandSelectShowStatus(item);
+}
+
+// 섬 온도·접속 인원·이번 주 고민 수를 보여 줘서 들어가기 전부터 섬 분위기를 알 수 있게
+const islandSelectStatusCache = new Map();
+async function islandSelectShowStatus(item) {
+  const box = document.getElementById('island-select-status');
+  const parts = [`이번 주 고민 ${item.postCount}개`];
+  box.textContent = parts.join(' · ');
+  try {
+    if (!islandSelectStatusCache.has(item.id)) {
+      islandSelectStatusCache.set(item.id, await api(`/islands/${item.id}/temperature`));
+    }
+    const status = islandSelectStatusCache.get(item.id);
+    if (document.getElementById('island-select-status') !== box) return;
+    parts.unshift(`🌡️ ${status.temperature}°`);
+    if (status.online) parts.push(`지금 접속 ${status.online}명`);
+    box.textContent = parts.join(' · ');
+  } catch {
+    // 온도를 모르는 이전 서버면 고민 수만 보여 줌
+  }
 }
 
 function islandSelectMove(delta) {
@@ -86,7 +108,7 @@ async function loadIslandSelect() {
   next.disabled = true;
   islandSelectSubtitle.textContent = '섬 목록을 불러오고 있어요.';
 
-  if (!localStorage.getItem('ondo-token')) {
+  if (!authToken()) {
     location.replace('index.html');
     return;
   }
@@ -98,6 +120,7 @@ async function loadIslandSelect() {
       id: island.id,
       kind: island.type === 'common' ? 'unified' : 'job',
       name: island.name,
+      postCount: island.post_count,
       path: island.type === 'common'
         ? 'unified-island.html'
         : 'village.html'

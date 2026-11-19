@@ -1,0 +1,875 @@
+/* 직무섬·통합섬 공통 추가 스타일 (댓글·답글·비슷한 고민·신고 등) */
+.reply.child {
+  margin-left: 24px;
+  border-left: 3px solid #d9e6dc;
+  padding-left: 10px;
+}
+.reply .muted {
+  color: #888;
+}
+.reply-avatar {
+  width: 24px;
+  height: 24px;
+  object-fit: contain;
+  vertical-align: middle;
+  margin-right: 6px;
+}
+.reply-actions {
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.reply-target {
+  margin: 4px 0;
+  font-size: 14px;
+  color: #3e6555;
+}
+.replies form .reply-target button {
+  padding: 0;
+  min-height: auto;
+  background: transparent;
+  color: #3e6555;
+  text-decoration: underline;
+  box-shadow: none;
+}
+.ai-typing {
+  color: #5d6f66;
+  font-style: italic;
+}
+.hidden-banner {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  justify-content: space-between;
+  margin: 10px 0;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: #fbeee9;
+  color: #8a3b2c;
+}
+.similar-posts:empty {
+  display: none;
+}
+.similar-posts {
+  display: grid;
+  gap: 8px;
+  margin: 14px 0;
+}
+.similar-card {
+  display: grid;
+  gap: 4px;
+  width: 100%;
+  text-align: left;
+  padding: 12px;
+  border-radius: 12px;
+  background: #f3f7f1;
+  color: #24412f;
+}
+.similar-card span {
+  font-size: 14px;
+  color: #4f6158;
+}
+.waiting-badge {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 2px 8px;
+  border-radius: 10px;
+  background: #fff3d6;
+  color: #7a5a12;
+  font-size: 12px;
+  font-weight: 700;
+}
+.my-summary {
+  margin: 8px 0 14px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: #f3f7f1;
+  color: #24412f;
+}
+.report-dialog form {
+  display: grid;
+  gap: 10px;
+}
+.report-dialog label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.invite-setting {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 12px 0;
+}
+.invite-setting input {
+  width: 20px;
+  height: 20px;
+}
+.feed-filters {
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+#waitingToggle[aria-pressed="true"] {
+  background: #3e6555;
+  color: #fff;
+}
+/* 터치 대상 최소 44px (접근성) */
+#detailBody button,
+#personal button,
+.feed-filters button,
+.report-dialog button {
+  min-height: 44px;
+}
+.replies form .reply-target button {
+  min-height: 32px;
+}
+.theme-picker .themes .theme-auto {
+  font-size: 13px;
+  font-weight: 700;
+  color: #24412f;
+}
+/* 캐릭터 색감 (BE CHARACTER_COLORS 키와 같음) */
+.tone-warm { filter: hue-rotate(-28deg) saturate(1.35); }
+.tone-forest { filter: hue-rotate(75deg) saturate(1.1); }
+.tone-ocean { filter: hue-rotate(165deg) saturate(1.1); }
+.tone-lavender { filter: hue-rotate(235deg) saturate(0.95); }
+.tone-pastel { filter: saturate(0.55) brightness(1.12); }
+.tone-vivid { filter: saturate(1.9) contrast(1.05); }
+.tone-mono { filter: grayscale(1); }
+.color-palette {
+  margin: 12px 0;
+}
+.palette-options {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+  margin-top: 8px;
+}
+.palette-options button {
+  display: grid;
+  justify-items: center;
+  gap: 2px;
+  padding: 6px 4px;
+  border-radius: 12px;
+  background: #f3f7f1;
+  color: #24412f;
+  font-size: 12px;
+}
+.palette-options button[aria-pressed="true"] {
+  outline: 3px solid #3e6555;
+}
+.palette-options img {
+  width: 44px;
+  height: 44px;
+  object-fit: contain;
+}
+
+/* ───────── 지도: 고민 자리 · 실시간 이웃 · 공명 · 모닥불 ───────── */
+.post-pin,
+.campfire {
+  transform: translate(-50%, -50%) scale(calc(1 / var(--scale, 1)));
+}
+.post-pin {
+  pointer-events: none;
+  gap: 3px;
+}
+.post-pin .walker,
+.author-pin .walker {
+  display: grid;
+  justify-items: center;
+  gap: 2px;
+  transition: transform 3s ease-in-out;
+}
+.post-pin img {
+  width: clamp(32px, 3.5vw, 54px);
+  height: clamp(36px, 4.2vw, 62px);
+}
+/* 글쓴이가 자리를 떠났으면 형체만 반투명하게 남음 */
+.post-pin.ghost img {
+  opacity: 0.45;
+  filter: grayscale(0.3);
+}
+.post-pin.ghost.mine img {
+  opacity: 0.55;
+}
+.worry-bubble {
+  position: relative;
+  pointer-events: auto;
+  max-width: 150px;
+  padding: 5px 10px;
+  border-radius: 14px;
+  background: #fffdf4;
+  color: #21443b;
+  font-size: 11px;
+  font-weight: 800;
+  line-height: 1.3;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  box-shadow: 0 3px 8px #18362b33;
+}
+.worry-bubble::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  bottom: -5px;
+  width: 10px;
+  height: 10px;
+  background: inherit;
+  transform: translateX(-50%) rotate(45deg);
+}
+.post-pin.mine .worry-bubble {
+  background: #dff3e6;
+}
+.marker .author-name,
+.marker .player-name {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.facing-left img {
+  transform: scaleX(-1);
+}
+/* 실시간 이웃은 3초마다 받은 위치로 걸어감 */
+.author-pin.live {
+  transition: left 2.9s linear, top 2.9s linear;
+}
+.author-pin.resonant {
+  z-index: 4;
+  transition: left 7s ease-in-out, top 7s ease-in-out;
+}
+/* 걸어오는 동안: 통통 걸음, 공명 표시는 도착한 뒤에 */
+.author-pin.resonant.approaching .walker img {
+  animation: resonance-glow 1.8s ease-in-out infinite, step-bob 0.42s ease-in-out infinite;
+}
+.author-pin.resonant.approaching .resonance-tag {
+  opacity: 0;
+}
+.author-pin.resonant .resonance-tag {
+  transition: opacity 0.6s ease;
+}
+.author-pin.facing-left .walker img {
+  transform: scaleX(-1);
+}
+@keyframes step-bob {
+  0%, 100% { translate: 0 0; rotate: -3deg; }
+  50% { translate: 0 -4px; rotate: 3deg; }
+}
+.online-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #2fd06f;
+  box-shadow: 0 0 0 2px #fff;
+}
+.player-marker.keyboard {
+  transition: left 0.08s linear, top 0.08s linear;
+}
+
+/* 기능 1. 공명: 머리 위 온도 이펙트 + 빛 */
+.author-pin.resonant img {
+  animation: resonance-glow 1.8s ease-in-out infinite;
+}
+@keyframes resonance-glow {
+  0%, 100% { filter: drop-shadow(0 0 2px #ffb24d); }
+  50% { filter: drop-shadow(0 0 12px #ff7a2f); }
+}
+.marker .resonance-tag {
+  pointer-events: none;
+  background: #fff1e0;
+  color: #b34a12;
+  border: 1px solid #ffc58f;
+  font-weight: 800;
+  animation: resonance-float 2.4s ease-in-out infinite;
+}
+@keyframes resonance-float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-4px); }
+}
+.resonance-count {
+  pointer-events: auto;
+  position: relative;
+  top: -6px;
+  order: -1;
+  padding: 5px 12px;
+  border-radius: 999px;
+  background: #ff8a3d;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 800;
+  white-space: nowrap;
+  box-shadow: 0 0 0 0 #ff8a3d88;
+  animation: resonance-pulse 2s ease-out infinite;
+}
+@keyframes resonance-pulse {
+  0% { box-shadow: 0 0 0 0 #ff8a3d88; }
+  100% { box-shadow: 0 0 0 14px #ff8a3d00; }
+}
+
+/* 기능 4. 섬 중앙 모닥불과 온도 */
+.campfire {
+  z-index: 3;
+  display: grid;
+  justify-items: center;
+  gap: 2px;
+  padding: 0;
+  background: transparent;
+  pointer-events: auto;
+  filter: none;
+}
+.marker .campfire-flame {
+  background: transparent;
+  padding: 0;
+  font-size: 30px;
+  line-height: 1;
+  transform-origin: 50% 90%;
+  animation: flame 1.1s ease-in-out infinite alternate;
+  filter: drop-shadow(0 0 8px #ff9a3c);
+}
+.campfire.level-cold .campfire-flame { font-size: 20px; opacity: 0.7; }
+.campfire.level-mild .campfire-flame { font-size: 28px; }
+.campfire.level-warm .campfire-flame { font-size: 36px; }
+.campfire.level-hot .campfire-flame { font-size: 46px; filter: drop-shadow(0 0 16px #ff6a1f); }
+.campfire.flare .campfire-flame { animation: flare 1.6s ease-out; }
+@keyframes flame {
+  from { transform: scale(1, 1) rotate(-2deg); }
+  to { transform: scale(1.08, 1.15) rotate(2deg); }
+}
+@keyframes flare {
+  0% { transform: scale(1); }
+  30% { transform: scale(1.6); }
+  100% { transform: scale(1); }
+}
+.marker .campfire-temp {
+  background: #fffdf4;
+  color: #b34a12;
+  border-radius: 999px;
+  padding: 2px 9px;
+  font-size: 12px;
+  font-weight: 800;
+  box-shadow: 0 2px 6px #18362b30;
+}
+.campfire.level-cold .campfire-temp { color: #2f5f86; }
+
+/* 섬 온도에 따른 날씨 */
+.map::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 1;
+  transition: background 1.5s ease, opacity 1.5s ease;
+  opacity: 0;
+}
+.map[data-weather="cold"]::after {
+  opacity: 1;
+  background:
+    radial-gradient(2px 2px at 20% 30%, #fff 50%, transparent 51%),
+    radial-gradient(2px 2px at 60% 10%, #fff 50%, transparent 51%),
+    radial-gradient(3px 3px at 80% 50%, #fff 50%, transparent 51%),
+    radial-gradient(2px 2px at 40% 70%, #fff 50%, transparent 51%),
+    radial-gradient(3px 3px at 10% 80%, #fff 50%, transparent 51%),
+    linear-gradient(#9cc8ff26, #9cc8ff26);
+  background-size: 220px 220px, 260px 260px, 300px 300px, 240px 240px, 280px 280px, 100% 100%;
+  animation: snow 9s linear infinite;
+}
+.map[data-weather="warm"]::after {
+  opacity: 1;
+  background: radial-gradient(circle at 50% 44%, #ffb34d22, transparent 60%);
+}
+.map[data-weather="hot"]::after {
+  opacity: 1;
+  background: radial-gradient(circle at 50% 44%, #ff8a3d33, #ffd27a14 55%, transparent 75%);
+}
+@keyframes snow {
+  from { background-position: 0 0, 0 0, 0 0, 0 0, 0 0, 0 0; }
+  to { background-position: 30px 220px, -20px 260px, 15px 300px, -10px 240px, 25px 280px, 0 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .map::after,
+  .marker .campfire-flame,
+  .author-pin.resonant img,
+  .resonance-count,
+  .marker .resonance-tag {
+    animation: none;
+  }
+}
+
+/* 기능 2. 페르소나 칭호 배지 */
+.persona-badge {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 1px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 800;
+  vertical-align: middle;
+  white-space: nowrap;
+}
+.persona-empathy { background: #ffe3ec; color: #a8325a; }
+.persona-experience { background: #e2efff; color: #2a5a8f; }
+.persona-opinion { background: #fff3cf; color: #7a5a12; }
+.my-persona {
+  margin: 4px 0 10px;
+}
+
+/* 기능 3. 12간지 보안관 */
+.guard-card {
+  display: grid;
+  grid-template-columns: 64px 1fr;
+  gap: 10px;
+  align-items: start;
+  margin-bottom: 10px;
+  padding: 12px;
+  border-radius: 16px;
+  background: #fff6e5;
+  border: 2px solid #f2b347;
+  animation: guard-in 0.5s ease-out;
+}
+.guard-card img {
+  width: 64px;
+  height: 64px;
+  object-fit: contain;
+}
+.guard-card p {
+  margin: 4px 0;
+}
+.guard-preview {
+  padding: 8px;
+  border-radius: 10px;
+  background: #fff;
+  font-size: 13px;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+@keyframes guard-in {
+  from { transform: translateY(10px) scale(0.96); opacity: 0; }
+  to { transform: none; opacity: 1; }
+}
+/* 멀리서 볼 때는 접속하지 않은 이웃의 이름표를 숨겨서 글 말풍선이 잘 보이게 */
+.map.zoomed-out .post-pin .author-name,
+.map.zoomed-out .author-pin.wander .author-name {
+  display: none;
+}
+.map .campfire {
+  z-index: 6;
+}
+
+/* 지도 위 패널은 거의 불투명하게: 뒤의 말풍선과 글자가 겹쳐 보이지 않게 */
+.glass.title,
+.glass.search,
+.glass.neighbors,
+.profile {
+  background: #fbfcf3f7;
+  backdrop-filter: blur(6px);
+}
+@media (max-width: 480px) {
+  /* 좁은 화면에서는 설명 줄을 숨겨 어색한 줄바꿈을 막음 */
+  .glass.neighbors #feedToggle small {
+    display: none;
+  }
+}
+
+/* 첫 방문 안내 */
+.world-guide {
+  width: min(420px, calc(100% - 32px));
+  border: 0;
+  border-radius: 20px;
+  padding: 22px;
+}
+.world-guide ul {
+  display: grid;
+  gap: 10px;
+  margin: 12px 0 18px;
+  padding: 0;
+  list-style: none;
+}
+.world-guide li {
+  line-height: 1.5;
+}
+.world-guide li b {
+  display: block;
+  color: #24412f;
+}
+.guide-button {
+  min-width: 44px;
+  font-weight: 800;
+}
+.place-hint {
+  margin: 6px 0;
+  color: #3e6555;
+  font-size: 13px;
+  font-weight: 700;
+}
+/* 가장자리 말풍선은 안쪽으로 밀고, 꼬리는 캐릭터 쪽에 남김 */
+.marker.edge-right .worry-bubble { translate: -66px 0; }
+.marker.edge-right .worry-bubble::after { left: min(calc(50% + 66px), calc(100% - 12px)); }
+.marker.edge-left .worry-bubble { translate: 66px 0; }
+.marker.edge-left .worry-bubble::after { left: max(calc(50% - 66px), 12px); }
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+/* 발자국: 최근 다녀간 이웃의 흔적 (점점 옅어짐) */
+.map .footprint {
+  z-index: 1;
+  display: flex;
+  gap: 5px;
+  pointer-events: none;
+  transform: translate(-50%, -50%) rotate(-18deg);
+}
+.map .footprint i {
+  display: block;
+  width: 7px;
+  height: 10px;
+  border-radius: 50% 50% 45% 45%;
+  background: #5b4a32;
+}
+.map .footprint i:nth-child(2) { translate: 0 -6px; }
+.map .footprint i:nth-child(3) { translate: 0 -12px; }
+
+/* 유리병 편지 */
+.map .bottle {
+  z-index: 5;
+  display: grid;
+  justify-items: center;
+  gap: 2px;
+  padding: 2px 4px;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  animation: bottle-bob 2.6s ease-in-out infinite;
+}
+.map .bottle svg {
+  width: 44px;
+  height: 26px;
+  filter: drop-shadow(0 3px 3px #12403a55);
+}
+.map .bottle .bottle-label {
+  padding: 1px 8px;
+  border-radius: 10px;
+  background: #fffdf4;
+  color: #2b5a52;
+  font-size: 11px;
+  font-weight: 800;
+  box-shadow: 0 2px 6px #18362b33;
+}
+.map .bottle.drift {
+  animation: bottle-drift 0.9s ease-in forwards;
+}
+@keyframes bottle-bob {
+  0%, 100% { translate: 0 0; rotate: -4deg; }
+  50% { translate: 0 -5px; rotate: 4deg; }
+}
+@keyframes bottle-drift {
+  to { translate: 60px 20px; opacity: 0; }
+}
+.bottle-dialog {
+  width: min(460px, calc(100% - 32px));
+  max-height: calc(100dvh - 48px);
+  border: 0;
+  border-radius: 20px;
+  padding: 0;
+  background: transparent;
+}
+.bottle-paper {
+  position: relative;
+  display: grid;
+  gap: 8px;
+  padding: 22px;
+  border-radius: 20px;
+  background: #fbf6e8;
+  color: #3a3324;
+}
+.bottle-from {
+  margin: 0;
+  color: #8a7146;
+  font-size: 13px;
+  font-weight: 700;
+}
+.bottle-paper h2 {
+  margin: 0;
+  font-size: 19px;
+}
+.bottle-author {
+  margin: 0;
+  color: #6a5d43;
+  font-size: 13px;
+}
+.bottle-body {
+  margin: 0;
+  line-height: 1.6;
+  white-space: pre-wrap;
+}
+.bottle-story {
+  padding: 10px 12px;
+  border-left: 4px solid #6fae8f;
+  border-radius: 8px;
+  background: #eef6ee;
+}
+.bottle-story p {
+  margin: 4px 0 0;
+  line-height: 1.5;
+}
+.bottle-paper textarea {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 10px;
+  border: 1px solid #d8ccb0;
+  border-radius: 12px;
+  background: #fffdf7;
+  font: inherit;
+  resize: vertical;
+}
+.bottle-error {
+  margin: 0;
+  color: #b0402b;
+  font-size: 13px;
+}
+.bottle-actions {
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+.bottle-close {
+  position: absolute;
+  top: 12px;
+  right: 14px;
+}
+.bottle-dialog::backdrop { background: #10302a66; }
+
+/* 나만보기 고민: 온도와 둘만의 대화 */
+.private-chat {
+  display: grid;
+  gap: 8px;
+  margin-top: 14px;
+}
+.private-chat h3 { margin: 0; }
+.private-note {
+  margin: 0;
+  color: #4d6a5d;
+  font-size: 13px;
+}
+.chat-log {
+  display: grid;
+  gap: 8px;
+  max-height: 320px;
+  overflow-y: auto;
+  padding: 10px;
+  border-radius: 14px;
+  background: #f1f6ef;
+}
+.chat-bubble {
+  max-width: 82%;
+  margin: 0;
+  padding: 9px 12px;
+  border-radius: 14px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+}
+.chat-bubble.from-ai {
+  justify-self: start;
+  border-bottom-left-radius: 4px;
+  background: #fff;
+  box-shadow: 0 1px 3px #18362b22;
+}
+.chat-bubble.from-me {
+  justify-self: end;
+  border-bottom-right-radius: 4px;
+  background: #d6efe2;
+}
+.chat-bubble.typing { color: #6b7d74; }
+.private-chat .row input { flex: 1; min-width: 0; }
+.chat-remaining { color: #6b7d74; }
+
+@media (prefers-reduced-motion: reduce) {
+  .map .bottle, .map .bottle.drift { animation: none; }
+}
+
+/* ───────── 살아 있는 섬: 시간대별 분위기 ───────── */
+.ambient {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+.ambient i,
+.ambient div,
+.ambient svg {
+  position: absolute;
+  pointer-events: none;
+}
+#markers { position: absolute; inset: 0; }
+
+/* 시간대 빛 */
+.ambient .light {
+  inset: 0;
+  mix-blend-mode: soft-light;
+  transition: background 1.2s ease;
+}
+.map[data-time="dawn"] .ambient .light {
+  background:
+    radial-gradient(60% 50% at 8% 0%, #ffd2b8cc, transparent 70%),
+    linear-gradient(160deg, #ffc9d455, transparent 55%);
+}
+.map[data-time="day"] .ambient .light {
+  background:
+    repeating-linear-gradient(115deg, #fff8d000 0 9%, #fff8d03a 12%, #fff8d000 16%),
+    radial-gradient(70% 60% at 88% -10%, #fffbe0aa, transparent 70%);
+  animation: rays 14s ease-in-out infinite alternate;
+}
+.map[data-time="sunset"] .ambient .light {
+  background:
+    radial-gradient(80% 70% at 100% 10%, #ffb066cc, transparent 70%),
+    linear-gradient(180deg, #ff8a5c33, #6a3a8a33);
+}
+.map[data-time="night"] .ambient .light {
+  mix-blend-mode: multiply;
+  background: radial-gradient(85% 75% at 50% 45%, transparent 45%, #0d1a3a88 100%);
+}
+@keyframes rays {
+  from { opacity: 0.55; transform: translateX(-2%); }
+  to { opacity: 1; transform: translateX(2%); }
+}
+
+/* 구름 그림자: 낮·일출·노을에 천천히 지나감 */
+.ambient .cloud-shadow {
+  width: 34%;
+  height: 22%;
+  border-radius: 50%;
+  background: radial-gradient(closest-side, #1d3b2a38, transparent);
+  filter: blur(10px);
+  animation: cloud-drift 70s linear infinite;
+}
+.ambient .cloud-shadow.one { top: 12%; animation-delay: -10s; }
+.ambient .cloud-shadow.two { top: 48%; width: 42%; animation-duration: 95s; animation-delay: -55s; }
+.ambient .cloud-shadow.three { top: 72%; width: 28%; animation-duration: 80s; animation-delay: -30s; }
+.map[data-time="night"] .ambient .cloud-shadow { display: none; }
+@keyframes cloud-drift {
+  from { left: -45%; }
+  to { left: 110%; }
+}
+
+/* 강물 반짝임 */
+.ambient .sparkle {
+  width: 9px;
+  height: 9px;
+  margin: -4px 0 0 -4px;
+  background:
+    linear-gradient(#fff, #fff) center / 100% 2px no-repeat,
+    linear-gradient(#fff, #fff) center / 2px 100% no-repeat;
+  opacity: 0;
+  animation: sparkle 3.2s ease-in-out infinite;
+}
+.map[data-time="night"] .ambient .sparkle { filter: hue-rotate(160deg) brightness(0.9); }
+@keyframes sparkle {
+  0%, 60%, 100% { opacity: 0; transform: scale(0.3) rotate(0deg); }
+  75% { opacity: 0.95; transform: scale(1) rotate(45deg); }
+}
+
+/* 모닥불 빛: 노을·밤에 더 진하게 */
+.ambient .fire-glow {
+  width: 26%;
+  aspect-ratio: 1;
+  translate: -50% -42%;
+  border-radius: 50%;
+  background: radial-gradient(closest-side, #ffb34d55, #ff8a3d22 55%, transparent);
+  mix-blend-mode: screen;
+  opacity: 0.35;
+  animation: glow 2.4s ease-in-out infinite alternate;
+}
+.map[data-time="sunset"] .ambient .fire-glow { opacity: 0.6; }
+.map[data-time="night"] .ambient .fire-glow { opacity: 1; width: 34%; }
+@keyframes glow {
+  from { scale: 0.94; }
+  to { scale: 1.06; }
+}
+
+/* 새 떼: 낮·노을에 가끔 섬을 가로지름 */
+.ambient .flock {
+  display: flex;
+  gap: 6px;
+  color: #2a3b33;
+  opacity: 0;
+  animation: fly 26s linear infinite;
+}
+.ambient .flock svg { position: static; width: 18px; height: 8px; }
+.ambient .flock svg:nth-child(2) { translate: 0 -6px; }
+.ambient .flock svg:nth-child(3) { translate: 0 4px; }
+.ambient .flock.one { top: 16%; }
+.ambient .flock.two { top: 34%; animation-duration: 34s; animation-delay: -14s; }
+.map[data-time="day"] .ambient .flock,
+.map[data-time="sunset"] .ambient .flock { opacity: 0.6; }
+.map[data-time="sunset"] .ambient .flock { color: #3a2440; }
+@keyframes fly {
+  from { left: -8%; transform: translateY(0); }
+  50% { transform: translateY(-14px); }
+  to { left: 108%; transform: translateY(6px); }
+}
+
+/* 꽃잎: 일출에 흩날림 */
+.ambient .petal {
+  top: -4%;
+  display: none;
+  width: 7px;
+  height: 5px;
+  border-radius: 70% 0 70% 0;
+  background: #ffc3d2;
+  animation: petal-fall 14s linear infinite;
+}
+.map[data-time="dawn"] .ambient .petal { display: block; }
+@keyframes petal-fall {
+  from { transform: translate(0, 0) rotate(0deg); opacity: 0; }
+  10% { opacity: 0.9; }
+  to { transform: translate(-60px, 105vh) rotate(540deg); opacity: 0; }
+}
+
+/* 반딧불이: 밤에만 */
+.ambient .firefly {
+  display: none;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: #f4ff9c;
+  box-shadow: 0 0 8px 3px #e6ff6a99;
+  animation: firefly-move 7s ease-in-out infinite alternate, firefly-blink 2.6s ease-in-out infinite;
+}
+.map[data-time="night"] .ambient .firefly,
+.map[data-time="sunset"] .ambient .firefly:nth-child(3n) { display: block; }
+@keyframes firefly-move {
+  to { transform: translate(var(--fx), var(--fy)); }
+}
+@keyframes firefly-blink {
+  0%, 100% { opacity: 0.15; }
+  50% { opacity: 1; }
+}
+
+/* 캐릭터 숨쉬기: 가만히 있어도 살아 있는 느낌 */
+.marker .walker img,
+.player-marker > img {
+  transform-origin: 50% 100%;
+  animation: breathe 3.2s ease-in-out infinite;
+}
+.marker:nth-child(3n) .walker img { animation-delay: -1.1s; }
+.marker:nth-child(3n + 1) .walker img { animation-delay: -2.2s; }
+@keyframes breathe {
+  0%, 100% { scale: 1 1; }
+  50% { scale: 1.02 0.975; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ambient *,
+  .marker .walker img,
+  .player-marker > img { animation: none !important; }
+  .ambient .petal,
+  .ambient .flock,
+  .ambient .cloud-shadow { display: none !important; }
+}

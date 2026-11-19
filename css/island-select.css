@@ -504,3 +504,9 @@ body {
     left: 3%;
   }
 }
+.island-select-status {
+  margin: 4px 0 10px;
+  color: #24594f;
+  font-size: 14px;
+  font-weight: 700;
+}

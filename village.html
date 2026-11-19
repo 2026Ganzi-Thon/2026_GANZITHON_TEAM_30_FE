@@ -1,8 +1,9 @@
 <!doctype html>
 <html lang="ko">
 <head>
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self' https://ondo-api.onrender.com; base-uri 'self'; form-action 'self'; object-src 'none'">
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>ON-DO 직무섬</title><link rel="stylesheet" href="css/village.css?v=20261117-003"><script src="js/api.js"></script><script defer src="js/review.js"></script><script defer src="js/village.js?v=20261117-003"></script>
+<title>ON-DO 직무섬</title><link rel="stylesheet" href="css/village.css?v=20261117-003"><link rel="stylesheet" href="css/island-extra.css?v=20261119-12"><script defer src="js/api.js?v=20261119-4"></script><script defer src="js/review.js"></script><script defer src="js/village.js?v=20261119-2"></script><script defer src="js/island-core.js?v=20261119-13"></script>
 </head>
 <body>
 <main class="village">
@@ -17,7 +18,7 @@
 <p id="zoomGuide" class="glass zoom-guide" role="status" hidden><span aria-hidden="true">↔ ↕</span> 지도를 움직이거나 오른쪽 고민을 눌러보세요</p>
 <form id="search" class="glass search">
 <label for="query">✦ 내 고민과 닮은 이야기 찾기</label>
-<div class="row"><input id="query" type="search" aria-controls="searchFilters" placeholder="내 이야기를 공개하지 않아도 비슷한 경험을 읽을 수 있어요."><button>찾아보기</button></div>
+<div class="row"><input id="query" type="search" aria-controls="searchFilters" placeholder="예: 회의 때 말하기 어려워요" title="내 이야기를 공개하지 않아도 비슷한 경험을 읽을 수 있어요."><button>찾아보기</button></div>
 <div id="searchFilters" hidden>
 <fieldset class="search-filters">
 <legend>필터</legend>
@@ -38,7 +39,7 @@
 <button id="feedToggle" type="button" aria-expanded="false" aria-controls="feedPanel">
 <span><strong>이웃의 마음</strong><small>지도를 찾지 않아도, 여기서 바로 만나요</small></span><span id="count" aria-live="polite"></span><span class="feed-chevron" aria-hidden="true">⌄</span>
 </button>
-<div id="feedPanel" hidden><button id="reset" class="soft" hidden>초기화</button><div id="feed"></div></div>
+<div id="feedPanel" hidden><div class="row feed-filters"><button type="button" id="waitingToggle" class="soft" aria-pressed="false">답을 기다리는 고민</button><button id="reset" class="soft" hidden>초기화</button></div><div id="feed"></div></div>
 </aside>
 <div class="glass zoom-tools" role="group" aria-label="지도 확대 및 축소"><button id="zoomOut" aria-label="지도 축소">−</button><button id="zoomReset" aria-label="지도 배율 초기화">100%</button><button id="zoomIn" aria-label="지도 확대">+</button></div>
 <button id="compose" class="compose">고민 나누기</button>
