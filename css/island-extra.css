@@ -2114,3 +2114,28 @@ body {
 @media (max-width: 420px) {
   .report-picks { grid-template-columns: 1fr; }
 }
+
+/* ───────── 닮은 고민 말풍선 묶음 ───────── */
+.worry-bubble.grouped {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  max-width: 170px;
+  background: #fff6e2;
+  box-shadow: 0 3px 8px #18362b33, 3px 3px 0 -1px #fffdf4, 3px 3px 0 0 #e7d6b0;
+}
+.bubble-count {
+  flex: 0 0 auto;
+  padding: 0 6px;
+  border-radius: 8px;
+  background: #e59a3a;
+  color: #fff;
+  font-size: 10px;
+  line-height: 16px;
+}
+.bubble-title { margin: 0; font-size: 18px; }
+.bottle-next {
+  margin: 4px 0 0;
+  color: #6b7f74;
+  font-size: 12px;
+}

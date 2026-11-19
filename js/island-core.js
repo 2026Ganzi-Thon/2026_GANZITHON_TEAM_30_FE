@@ -522,18 +522,24 @@ function renderMarkers() {
     const similarity = resonance.get(id);
     const anchor = postSpot(neighbor);
     const away = Boolean(live || similarity);
+    const latest = neighbor.latest_post;
+    // 서버가 내용이 닮은 고민끼리 묶어 줌 → 대표 글 자리에만 말풍선 하나("+N"), 나머지는 그리지 않음
+    const merged = Boolean(latest?.bubble && latest.bubble !== latest.id);
+    const groupSize = latest?.bubble === latest?.id ? latest.bubble_size || 1 : 1;
     placed.add(id);
+    if (merged && !away) continue;
 
     // 고민을 남긴 자리: 글쓴이 형체 + 글 말풍선
-    if (neighbor.latest_post) {
+    if (latest && !merged) {
+      const bubbleAttr = groupSize > 1 ? `data-bubble-group="${latest.id}"` : `data-post="${latest.id}"`;
       items.push({
         key: "post-" + id,
         ...anchor,
         html: `
           <div class="marker post-pin ${away ? "ghost" : "wander"}">
-            <button type="button" class="worry-bubble" data-post="${neighbor.latest_post.id}"
-              aria-label="${escapeText(author.nickname)}의 고민: ${escapeText(neighbor.latest_post.title)}">
-              ${escapeText(shortTitle(neighbor.latest_post.title))}
+            <button type="button" class="worry-bubble${groupSize > 1 ? " grouped" : ""}" ${bubbleAttr}
+              aria-label="${groupSize > 1 ? `닮은 고민 ${groupSize}개 모아 보기` : `${escapeText(author.nickname)}의 고민`}: ${escapeText(latest.title)}">
+              ${escapeText(shortTitle(latest.title, groupSize > 1 ? 11 : 14))}${groupSize > 1 ? `<b class="bubble-count">+${groupSize - 1}</b>` : ""}
             </button>
             <div class="walker">
               ${characterImg(author, away ? "" : escapeText(author.nickname) + "의 캐릭터")}
@@ -544,7 +550,7 @@ function renderMarkers() {
     }
 
     // 접속 중이거나 공명해서 자리를 떠난 캐릭터
-    if (away || !neighbor.latest_post) {
+    if (away || !latest) {
       const pos = similarity ? nearMe(id) : live ? insideIsland(live) : anchor;
       items.push({
         key: "who-" + id,
@@ -699,7 +705,7 @@ function setupWorldGuide() {
         <li><b>모닥불</b> 고민과 위로가 쌓일수록 섬이 따뜻해져요. 목표는 36.5°예요.</li>
         <li><b>유리병 편지</b> 강물에 떠내려온 병을 열면 다른 섬의 고민과 그 뒤 이야기가 들어 있어요.</li>
         <li><b>칭호</b> 캐릭터마다 위로 성향이 있고, 위로를 건넬수록 활동 칭호가 자라요. 프로필의 칭호 도감에서 볼 수 있어요.</li>
-        <li><b>섬지기</b> 광장의 섬지기를 누르면 이번 주의 질문, 섬 소식, 이용 원칙을 볼 수 있어요.</li>
+        <li><b>섬지기</b> 광장의 섬지기를 누르면 이번 주 질문, 섬 소식, 이용 원칙을 볼 수 있어요.</li>
       </ul>
       <button value="ok" class="wide">둘러보기</button>
     </form>`;
@@ -833,16 +839,15 @@ function footprintItems() {
 
 // ── 유리병 편지: 다른 섬에서 떠내려온 고민과, 그 뒤 글쓴이가 남긴 이야기 ──
 const bottlePoint = { x: 65, y: 62 }; // 강물 위
-const bottleSeen = [];
-let bottle = null;
+let bottle = null; // 오늘의 유리병 편지 (하루 한 통, 아침 8시에 새로 옴)
+let bottleTimer = null;
 
 async function loadBottle() {
   if (!Number.isInteger(islandId)) return;
   try {
-    const params = bottleSeen.slice(-50).map((id) => `skip=${id}`).join("&");
-    bottle = await api(`/islands/${islandId}/bottle${params ? "?" + params : ""}`);
+    bottle = await api(`/islands/${islandId}/bottle`);
   } catch {
-    bottle = null; // 떠내려온 병이 없거나 이전 서버
+    bottle = null; // 오늘 편지를 이미 읽었거나, 떠내려온 병이 없음
   }
   renderMarkers();
 }
@@ -1056,6 +1061,13 @@ async function loadInsights(panel, dialog) {
   });
 }
 
+// "11월 19일 아침 8시" (리포트 기준 시각)
+const reportStamp = (iso) => {
+  if (!iso) return "오늘 아침 8시";
+  const t = new Date(iso);
+  return `${t.getMonth() + 1}월 ${t.getDate()}일 아침 8시`;
+};
+
 function renderInsights(d) {
   if (!d.enough) {
     return `<p class="report-empty">아직 이 섬에 공개 고민이 ${Number(d.total_posts)}개예요.<br>
@@ -1078,7 +1090,7 @@ function renderInsights(d) {
   const me = d.me;
   return `
     <section class="keeper-card report-summary">
-      <h3>한눈에 보기 <small>공개 고민 ${Number(d.total_posts)}개 · 이번 주 ${Number(d.week_posts)}개</small></h3>
+      <h3>한눈에 보기 <small>${reportStamp(d.as_of)} 기준 · 공개 고민 ${Number(d.total_posts)}개 · 이번 주 ${Number(d.week_posts)}개</small></h3>
       <ul class="report-lines">${d.headlines.map((line) => `<li>${escapeText(line)}</li>`).join("")}</ul>
     </section>
 
@@ -1140,7 +1152,43 @@ function renderInsights(d) {
       </ul>
     </section>` : ""}
 
-    <p class="keeper-foot">공개 고민만 모아 셌어요. 글 내용은 리포트에 쓰지 않고, 닮은 정도는 고민을 AI 임베딩으로 바꿔 잰 코사인 유사도예요.</p>`;
+    <p class="keeper-foot">리포트는 매일 아침 8시에 새로 정리돼요. 공개 고민만 모아 셌어요. 글 내용은 리포트에 쓰지 않고, 닮은 정도는 고민을 AI 임베딩으로 바꿔 잰 코사인 유사도예요.</p>`;
+}
+
+// 닮은 고민 말풍선을 누르면: 그 묶음에 든 고민 목록
+function openBubbleGroup(leadId) {
+  const members = serverNeighbors
+    .filter((n) => n.latest_post?.bubble === leadId)
+    .sort((a, b) => (b.latest_post.id === leadId) - (a.latest_post.id === leadId));
+  if (!members.length) return;
+  let dialog = el("bubbleDialog");
+  if (!dialog) {
+    dialog = document.createElement("dialog");
+    dialog.id = "bubbleDialog";
+    dialog.className = "keeper-dialog";
+    dialog.setAttribute("aria-labelledby", "bubbleTitle");
+    document.body.append(dialog);
+  }
+  dialog.innerHTML = `
+    <form method="dialog" class="keeper-paper">
+      <h2 id="bubbleTitle" class="bubble-title">닮은 고민 ${members.length}개</h2>
+      <p class="keeper-note">내용이 비슷한 고민을 AI가 한 말풍선으로 모았어요. 같은 마음인 이웃이 이만큼 있어요.</p>
+      <div class="report-groups">
+        ${members.map((n) => `
+          <button type="button" class="report-group" data-group-post="${Number(n.latest_post.id)}">
+            <strong>${escapeText(n.latest_post.title)}</strong>
+            <small>${escapeText(n.author.nickname)}</small>
+          </button>`).join("")}
+      </div>
+      <button value="close" class="soft wide">닫기</button>
+    </form>`;
+  dialog.querySelectorAll("[data-group-post]").forEach((button) => {
+    button.onclick = () => {
+      dialog.close();
+      showPost(Number(button.dataset.groupPost));
+    };
+  });
+  dialog.showModal();
 }
 
 function openBottle() {
@@ -1169,28 +1217,45 @@ function openBottle() {
       <label for="bottleReply">답장을 담아 다시 띄워 보내요</label>
       <textarea id="bottleReply" maxlength="400" rows="3" placeholder="같은 마음이었던 적이 있다면 한마디 남겨 주세요"></textarea>
       <p class="bottle-error" id="bottleError" role="alert" hidden></p>
+      <p class="bottle-next">유리병은 하루에 한 통, 아침 8시에 떠내려와요. 읽고 나면 강물로 돌아가요.</p>
       <div class="row bottle-actions">
-        <button type="button" class="soft" id="bottleNext">다른 병 건지기</button>
         <button type="button" class="soft" id="bottleOpenPost">글 전체 보기${letter.comment_count ? ` · 위로 ${letter.comment_count}` : ""}</button>
         <button type="button" id="bottleSend">답장 띄우기</button>
       </div>
       <button value="close" class="plain bottle-close" aria-label="닫기">닫기</button>
     </form>`;
 
+  // 열면 읽음으로 표시 → 닫으면 병이 떠내려가 사라지고, 다음 날 아침 8시에 새 병이 옴
+  api(`/islands/${islandId}/bottle/open`, { method: "POST" }).catch(() => {});
+  const gone = () => {
+    bottle = null;
+    renderMarkers();
+    clearTimeout(bottleTimer);
+    const wait = new Date(letter.next_at).getTime() - Date.now();
+    if (wait > 0 && wait < 86400000) bottleTimer = setTimeout(loadBottle, wait + 5000);
+  };
+  let finished = false;
   const done = (message) => {
-    bottleSeen.push(letter.post_id);
+    if (finished) return; // 닫기·답장·글 보기 어느 쪽으로 닫혀도 한 번만
+    finished = true;
     dialog.close();
     if (message) toast(message);
-    const node = el("markers").querySelector(".bottle");
-    node?.classList.add("drift");
-    setTimeout(loadBottle, 900);
+    el("markers").querySelector(".bottle")?.classList.add("drift");
+    setTimeout(gone, 900);
   };
-  dialog.querySelector("#bottleNext").onclick = () => done("");
+  // 닫기 버튼·Esc·글 보기 어느 쪽으로 닫아도 병이 사라지게 (close 이벤트는 예비)
+  dialog.querySelector(".bottle-close").onclick = (event) => {
+    event.preventDefault();
+    done("");
+  };
+  dialog.oncancel = (event) => {
+    event.preventDefault();
+    done("");
+  };
+  dialog.onclose = () => done("");
   dialog.querySelector("#bottleOpenPost").onclick = () => {
-    bottleSeen.push(letter.post_id);
-    dialog.close();
+    done("");
     showPost(letter.post_id);
-    loadBottle();
   };
   dialog.querySelector("#bottleSend").onclick = async (event) => {
     const text = dialog.querySelector("#bottleReply").value.trim();
@@ -3129,6 +3194,7 @@ if (me && authToken()) {
     if (button.hasAttribute("data-campfire")) showCampfireInfo();
     if (button.hasAttribute("data-bottle")) openBottle();
     if (button.hasAttribute("data-keeper")) openKeeper();
+    if (button.dataset.bubbleGroup) openBubbleGroup(Number(button.dataset.bubbleGroup));
     if (button.dataset.themeAuto !== undefined) {
       state.themeMode = "auto";
       save();
