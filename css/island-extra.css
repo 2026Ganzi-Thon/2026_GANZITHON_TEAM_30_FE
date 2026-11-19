@@ -70,8 +70,10 @@
   color: #4f6158;
 }
 .waiting-badge {
+  /* 제목 앞에 둔다: 제목이 길어 말줄임(…)이 돼도 배지는 잘리지 않게 */
   display: inline-block;
-  margin-left: 6px;
+  margin-right: 6px;
+  vertical-align: 1px;
   padding: 2px 8px;
   border-radius: 10px;
   background: #fff3d6;
@@ -872,4 +874,1243 @@
   .ambient .petal,
   .ambient .flock,
   .ambient .cloud-shadow { display: none !important; }
+}
+
+/* ---------- 글 상세: 고민 본문 · 위로 대화 · 비슷한 고민을 세 구역으로 ---------- */
+.detail-head {
+  align-items: flex-start;
+}
+/* 글쓴이: 이름 → 직무·연차 → 칭호·성격 배지 순서로 쌓고, 배지는 한 줄에 넘치면 다음 줄로 */
+.detail-author {
+  flex: 1 1 auto;
+  min-width: 0;
+  align-items: flex-start;
+}
+.detail-who {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+.detail-who .badge-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.detail-who .badge-row:empty {
+  display: none;
+}
+.detail-who .badge-row > * {
+  margin: 0;
+}
+.detail-tools {
+  gap: 6px;
+  flex: 0 0 auto;
+}
+.me-tag {
+  display: inline-block;
+  margin-left: 4px;
+  padding: 1px 7px;
+  border-radius: 8px;
+  background: #24594f;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  vertical-align: middle;
+}
+/* ⋯ 메뉴 (신고·차단 / 수정·삭제) */
+.more-menu {
+  position: relative;
+}
+.more-menu summary {
+  list-style: none;
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: #e9f1e8;
+  color: #244e40;
+  font-size: 20px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.more-menu summary::-webkit-details-marker {
+  display: none;
+}
+.more-menu summary:focus-visible {
+  outline: 3px solid #24594f;
+  outline-offset: 2px;
+}
+.more-list {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 6px);
+  z-index: 5;
+  display: grid;
+  min-width: 140px;
+  padding: 6px;
+  border-radius: 12px;
+  background: #fff;
+  border: 1px solid #dde6db;
+  box-shadow: 0 10px 24px #173a2a2e;
+}
+#detailBody .more-list button {
+  min-height: 40px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  background: transparent;
+  color: #24412f;
+  text-align: left;
+  box-shadow: none;
+  font-weight: 600;
+}
+#detailBody .more-list button:hover,
+#detailBody .more-list button:focus-visible {
+  background: #eef5ee;
+}
+#detailBody .more-list .danger-text {
+  color: #a23c2a;
+}
+
+/* ① 고민 본문: 흰 카드 */
+.post-card {
+  margin: 12px 0 4px;
+  padding: 16px 16px 12px;
+  border-radius: 16px;
+  background: #fff;
+  border: 1px solid #e1ebe1;
+  box-shadow: 0 2px 10px #173a2a12;
+}
+.post-card .detail-meta {
+  display: block;
+  margin: 0 0 6px;
+  color: #5d7066;
+}
+.post-card .detail-title {
+  margin: 0 0 8px;
+  font-size: 21px;
+  line-height: 1.35;
+}
+.post-card .post-text {
+  margin: 0 0 12px;
+  line-height: 1.65;
+}
+
+/* ② 위로 대화 */
+.section-title {
+  margin: 0 0 8px;
+  font-size: 16px;
+  color: #24412f;
+}
+.section-title .count {
+  color: #5d7066;
+  font-weight: 600;
+}
+.section-note {
+  margin: -4px 0 8px;
+  font-size: 13px;
+  color: #5d7066;
+}
+.replies {
+  margin: 18px 0 0;
+  padding-top: 0;
+  border-top: 0;
+}
+.thread {
+  margin: 0 0 10px;
+}
+.reply {
+  margin: 0;
+  padding: 10px 12px 6px;
+  border-radius: 12px;
+  background: #f2f6f0;
+}
+.reply p {
+  margin: 4px 0 2px;
+  line-height: 1.55;
+}
+.reply-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+}
+.reply-head .reply-avatar {
+  margin-right: 2px;
+}
+/* 온도(AI) 댓글: 따뜻한 색 */
+.reply.from-ai {
+  background: #fff4e8;
+  border: 1px solid #f6dfc4;
+}
+.reply.from-ai .reply-head strong {
+  color: #9a5a17;
+}
+/* 내 댓글: 테두리로만 살짝 */
+.reply.mine {
+  border: 1px solid #b9d6c6;
+}
+/* 답글: 상자 대신 왼쪽 세로선으로 이어지는 대화 */
+.reply.child {
+  margin: 4px 0 0 18px;
+  padding: 6px 10px 4px 12px;
+  border-radius: 0;
+  background: transparent;
+  border: 0;
+  border-left: 3px solid #cfe1d3;
+}
+.reply.child.from-ai {
+  border-left-color: #f0c99c;
+}
+.reply-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 10px;
+  margin: 2px 0 0;
+}
+#detailBody .link-btn {
+  min-height: 32px;
+  padding: 4px 2px;
+  background: transparent;
+  color: #2f5f50;
+  font-size: 13px;
+  font-weight: 700;
+  box-shadow: none;
+}
+#detailBody .link-btn.quiet {
+  color: #7a8a82;
+  font-weight: 600;
+}
+#detailBody .link-btn:hover {
+  text-decoration: underline;
+}
+#detailBody .thank-btn[aria-pressed="true"] {
+  color: #c2410c;
+}
+.empty-replies {
+  margin: 4px 0 10px;
+  color: #5d7066;
+}
+/* 입력창: 위로 구역 맨 아래 */
+.composer {
+  margin: 12px 0 0;
+  padding: 10px;
+  border-radius: 14px;
+  background: #e9f1e8;
+}
+.composer .reply-target {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0 0 6px;
+  font-weight: 700;
+}
+.composer .reply-target[hidden] {
+  display: none;
+}
+.composer input {
+  background: #fff;
+}
+
+/* ③ 비슷한 고민: 다른 글로 가는 링크 카드 (댓글과 다른 모양) */
+.similar-posts {
+  margin: 22px 0 6px;
+  padding-top: 16px;
+  border-top: 1px dashed #c9d8cc;
+  gap: 8px;
+}
+.similar-card {
+  background: #fff;
+  border: 1px solid #d6e3d8;
+  box-shadow: none;
+  transition: border-color 0.15s ease, transform 0.15s ease;
+}
+.similar-card:hover,
+.similar-card:focus-visible {
+  border-color: #24594f;
+  transform: translateY(-1px);
+}
+.similar-card small {
+  display: flex;
+  justify-content: space-between;
+  color: #5d7066;
+}
+.similar-card .go {
+  color: #24594f;
+  font-weight: 700;
+}
+
+/* ---------- 활동 칭호 ---------- */
+.title-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  margin: 0 3px;
+  padding: 1px 8px;
+  border-radius: 999px;
+  font-size: 11.5px;
+  font-weight: 700;
+  line-height: 1.6;
+  vertical-align: middle;
+  white-space: nowrap;
+}
+.title-badge.tier-1 {
+  background: #eef5ea;
+  color: #3d6b45;
+  border: 1px solid #d4e6d0;
+}
+.title-badge.tier-2 {
+  background: #fff1e4;
+  color: #9a4f12;
+  border: 1px solid #f5d2b0;
+}
+/* 빛나는(3)·전설(4): 반짝이는 띠가 지나감 */
+.title-badge.tier-3,
+.title-badge.tier-4 {
+  position: relative;
+  overflow: hidden;
+  color: #fff;
+  text-shadow: 0 1px 1px #0003;
+}
+.title-badge.tier-3 {
+  background: linear-gradient(120deg, #3a8f7a, #57b39a 45%, #2f7d6b);
+  box-shadow: 0 0 0 1px #2f7d6b33, 0 0 10px #57b39a66;
+}
+.title-badge.tier-4 {
+  background: linear-gradient(120deg, #b7791f, #f2c14e 40%, #e08a1e 70%, #b7791f);
+  box-shadow: 0 0 0 1px #b7791f55, 0 0 12px #f2c14e99;
+}
+.title-badge.tier-3::after,
+.title-badge.tier-4::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(110deg, transparent 30%, #ffffffa6 48%, transparent 66%);
+  transform: translateX(-120%);
+  animation: title-shine 3.2s ease-in-out infinite;
+}
+@keyframes title-shine {
+  0%, 55% { transform: translateX(-120%); }
+  85%, 100% { transform: translateX(120%); }
+}
+/* 지도 이름표 안에서는 아이콘만 작게 */
+.author-name .title-badge,
+.player-name .title-badge {
+  margin: 0 0 0 2px;
+  padding: 0 5px;
+  font-size: 10px;
+}
+
+/* 칭호 도감 (프로필) */
+.title-book {
+  display: grid;
+  gap: 14px;
+  margin-top: 10px;
+}
+.title-now {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 10px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  background: linear-gradient(135deg, #fff8ee, #eef7f0);
+  border: 1px solid #e7dcc8;
+}
+.title-now > span {
+  font-weight: 700;
+  color: #24412f;
+}
+.title-now .title-badge {
+  font-size: 13px;
+  padding: 3px 10px;
+}
+.title-now small {
+  color: #5d7066;
+}
+.title-tier h4 {
+  margin: 0 0 8px;
+  font-size: 14px;
+  color: #24412f;
+}
+.title-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(124px, 1fr)); /* 휴대폰에서도 두 줄로 */
+  gap: 8px;
+}
+#personal .title-card {
+  display: grid;
+  justify-items: start;
+  gap: 3px;
+  width: 100%;
+  min-height: 0;
+  padding: 10px 12px;
+  border-radius: 12px;
+  text-align: left;
+  background: #fff;
+  color: #24412f;
+  border: 1px solid #dfe8df;
+  box-shadow: none;
+  white-space: normal;
+}
+#personal .title-card strong {
+  font-size: 14px;
+}
+#personal .title-card small {
+  color: #5d7066;
+  font-size: 12px;
+  line-height: 1.4;
+}
+.title-icon {
+  font-size: 22px;
+  line-height: 1;
+}
+#personal .title-card.earned {
+  cursor: pointer;
+}
+#personal .title-card.earned.tier-2 {
+  background: #fffaf3;
+  border-color: #f2d6b8;
+}
+#personal .title-card.earned.tier-3 {
+  background: linear-gradient(160deg, #f1fbf7, #ffffff);
+  border-color: #8fcab8;
+  box-shadow: 0 0 10px #57b39a40;
+}
+#personal .title-card.earned.tier-4 {
+  background: linear-gradient(160deg, #fff6dc, #ffffff);
+  border-color: #eec66a;
+  box-shadow: 0 0 12px #f2c14e55;
+}
+#personal .title-card[aria-pressed="true"] {
+  outline: 3px solid #24594f;
+  outline-offset: 1px;
+}
+#personal .title-card.locked {
+  background: #f4f6f4;
+  color: #7a8a82;
+  cursor: default;
+  opacity: 1;
+}
+#personal .title-card.locked strong {
+  color: #6b7b73;
+}
+.title-progress {
+  display: block;
+  width: 100%;
+  height: 6px;
+  margin-top: 2px;
+  border-radius: 999px;
+  background: #e2e9e3;
+  overflow: hidden;
+}
+.title-progress i {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: #7fb69c;
+}
+.title-current {
+  margin-top: 2px;
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: #24594f;
+  color: #fff;
+  font-size: 11px;
+  font-style: normal;
+  font-weight: 700;
+}
+@media (prefers-reduced-motion: reduce) {
+  .title-badge.tier-3::after,
+  .title-badge.tier-4::after {
+    animation: none;
+    display: none;
+  }
+}
+
+/* ---------- 섬지기 (운영자 캐릭터) ---------- */
+.map .keeper {
+  z-index: 5;
+  display: grid;
+  justify-items: center;
+  gap: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+}
+.map .keeper .keeper-art {
+  width: 52px;
+  height: 52px;
+  filter: drop-shadow(0 3px 3px #12403a44);
+  animation: keeper-breathe 3.4s ease-in-out infinite;
+  transform-origin: 50% 90%;
+}
+.keeper-glow {
+  animation: keeper-lantern 2.2s ease-in-out infinite;
+}
+.map .keeper .keeper-name {
+  margin-top: -2px;
+  padding: 1px 9px;
+  border-radius: 10px;
+  background: #24594f;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 800;
+  box-shadow: 0 2px 6px #18362b44;
+  white-space: nowrap;
+}
+.map .keeper .keeper-bubble {
+  margin-bottom: 2px;
+  padding: 2px 8px;
+  border-radius: 10px 10px 10px 2px;
+  background: #fffdf4;
+  color: #8a5a12;
+  font-size: 10.5px;
+  font-weight: 800;
+  box-shadow: 0 2px 6px #18362b33;
+  white-space: nowrap;
+  animation: keeper-bubble 4s ease-in-out infinite;
+}
+.map .keeper:hover .keeper-art,
+.map .keeper:focus-visible .keeper-art {
+  transform: translateY(-3px) scale(1.06);
+}
+.map .keeper:focus-visible {
+  outline: 3px solid #24594f;
+  outline-offset: 2px;
+  border-radius: 12px;
+}
+@keyframes keeper-breathe {
+  0%, 100% { scale: 1 1; }
+  50% { scale: 1.02 0.98; }
+}
+@keyframes keeper-lantern {
+  0%, 100% { opacity: 0.25; }
+  50% { opacity: 0.6; }
+}
+@keyframes keeper-bubble {
+  0%, 70%, 100% { translate: 0 0; }
+  80% { translate: 0 -3px; }
+  90% { translate: 0 0; }
+}
+
+.keeper-dialog {
+  width: min(480px, calc(100% - 32px));
+  max-height: calc(100dvh - 48px);
+  border: 0;
+  border-radius: 20px;
+  padding: 0;
+  background: transparent;
+}
+.keeper-paper {
+  display: grid;
+  gap: 10px;
+  padding: 20px;
+  border-radius: 20px;
+  background: #f6faf6;
+  color: #24412f;
+}
+.keeper-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.keeper-head .keeper-art {
+  flex: 0 0 auto;
+}
+.keeper-head h2 {
+  margin: 0;
+  font-size: 20px;
+}
+.keeper-role {
+  display: inline-block;
+  white-space: nowrap;
+  margin-left: 4px;
+  padding: 1px 8px;
+  border-radius: 8px;
+  background: #24594f;
+  color: #fff;
+  font-size: 11px;
+  vertical-align: middle;
+}
+.keeper-say {
+  position: relative;
+  margin: 6px 0 0;
+  padding: 8px 12px;
+  border-radius: 4px 14px 14px 14px;
+  background: #fff;
+  border: 1px solid #dbe7dc;
+  line-height: 1.5;
+}
+.keeper-card {
+  padding: 12px 14px;
+  border-radius: 14px;
+  background: #fff;
+  border: 1px solid #e1ebe1;
+}
+.keeper-card h3 {
+  margin: 0 0 6px;
+  font-size: 14px;
+  color: #3d6b55;
+}
+.keeper-question {
+  background: linear-gradient(135deg, #fff7e8, #ffffff);
+  border-color: #f1d9b4;
+}
+.keeper-question p {
+  margin: 0 0 10px;
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 1.5;
+  color: #5a3d12;
+}
+.keeper-question button {
+  width: 100%;
+}
+.keeper-stats {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 6px;
+}
+.keeper-stat {
+  display: grid;
+  justify-items: center;
+  gap: 2px;
+  padding: 8px 4px;
+  border-radius: 10px;
+  background: #eef5ee;
+}
+.keeper-stat b {
+  font-size: 18px;
+  color: #24594f;
+}
+.keeper-stat span {
+  font-size: 11.5px;
+  color: #5d7066;
+  text-align: center;
+}
+.keeper-note {
+  margin: 8px 0 0;
+  font-size: 13px;
+  color: #4f6158;
+}
+.keeper-rules {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding-left: 18px;
+  line-height: 1.5;
+  font-size: 14px;
+}
+.keeper-crisis p {
+  margin: 0 0 8px;
+  font-size: 14px;
+}
+.keeper-crisis .row {
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.keeper-call {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 4px;
+  padding: 8px 12px;
+  border-radius: 12px;
+  background: #fdecea;
+  color: #8a2f22;
+  font-size: 13px;
+  text-decoration: none;
+}
+.keeper-note b,
+.keeper-call b,
+.keeper-call small {
+  white-space: nowrap; /* 전화번호(1577-0199)가 두 줄로 끊기지 않게 */
+}
+.keeper-call b {
+  font-size: 15px;
+}
+.keeper-crisis .row {
+  display: grid;
+  gap: 6px;
+}
+.keeper-crisis .keeper-call {
+  display: flex;
+  flex-wrap: wrap;
+  column-gap: 6px;
+}
+.keeper-crisis .keeper-call small {
+  margin-left: auto;
+}
+.keeper-foot {
+  margin: 2px 0 0;
+  font-size: 12px;
+  color: #6b7d74;
+  text-align: center;
+}
+@media (max-width: 480px) {
+  .keeper-stats {
+    /* 3칸 + 2칸: 둘째 줄 두 칸이 빈자리 없이 줄을 채우게 */
+    display: flex;
+    flex-wrap: wrap;
+  }
+  .keeper-stats .keeper-stat {
+    flex: 1 1 28%;
+  }
+}
+
+/* 첫 방문 안내: 섬지기가 인사 */
+.guide-keeper {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 4px;
+}
+.guide-keeper p {
+  margin: 0;
+  padding: 8px 12px;
+  border-radius: 4px 14px 14px 14px;
+  background: #eef5ee;
+  line-height: 1.45;
+}
+@media (prefers-reduced-motion: reduce) {
+  .map .keeper .keeper-art,
+  .keeper-glow,
+  .map .keeper .keeper-bubble {
+    animation: none;
+  }
+}
+
+/* ── 줄바꿈: 한글을 낱말 중간("원숭/이")이 아니라 띄어쓰기에서 끊기. 띄어쓰기 없이 긴 글자는 넘치지 않게 아무 데서나 끊기 ── */
+body {
+  word-break: keep-all;
+  overflow-wrap: break-word;
+}
+
+/* ── 휴대폰: 내 프로필 패널을 화면 폭에 맞추고, 길면(칭호 도감·내 댓글) 패널 안에서 스크롤 ── */
+@media (max-width: 690px) {
+  #personal.personal {
+    width: calc(100vw - 24px);
+    max-height: calc(100dvh - 150px);
+    overflow: auto;
+    overscroll-behavior: contain;
+  }
+}
+/* 내 프로필 패널을 열면 검색 카드(z-index 4)보다 위에 오게: 휴대폰에서 패널 윗부분이 가려지던 문제 */
+.identity:has(.profile[aria-expanded="true"]) {
+  z-index: 5;
+}
+
+/* 섬 이름 카드의 이웃 수: 좁은 칸에서도 잘리지 않고 항목 단위로 줄바꿈 */
+.title .island-counts,
+.title #people.island-counts {
+  display: grid; /* 항목마다 한 줄씩 (직무섬 village.css의 nowrap 한 줄 배치를 덮어씀) */
+  gap: 1px;
+  white-space: normal;
+}
+/* 내 프로필 버튼의 닉네임: 칸이 좁으면 말줄임 대신 두 줄까지 */
+.profile strong {
+  white-space: normal;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+}
+.zoom-identity .island-counts span + span::before {
+  content: "· ";
+  opacity: 0.6;
+}
+
+/* ── 위로 카드 구분 강화: 댓글 묶음(원 댓글 + 답글)마다 흰 카드 + 테두리, 버튼 줄은 점선으로 분리 ── */
+#detailBody .replies {
+  margin-top: 20px;
+  padding-top: 14px;
+  border-top: 1px solid #dde7de; /* 본문 카드와 위로 구역 사이 경계 */
+}
+#detailBody .thread {
+  margin: 0 0 12px;
+  border: 1px solid #d6e2d8;
+  border-radius: 14px;
+  background: #fff;
+  box-shadow: 0 1px 3px rgba(36, 65, 47, 0.08);
+  overflow: hidden;
+}
+#detailBody .thread > .reply:not(.child) {
+  padding: 12px 14px 6px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+/* 온도(AI) 묶음: 따뜻한 배경 + 왼쪽 주황 띠 */
+#detailBody .thread:has(> .reply.from-ai:not(.child)) {
+  background: #fff8f0;
+  border-color: #f0d4b0;
+  border-left: 4px solid #f0a95c;
+}
+/* 내 댓글 묶음: 왼쪽 초록 띠 */
+#detailBody .thread:has(> .reply.mine:not(.child)) {
+  border-left: 4px solid #6fae8f;
+}
+/* 답글: 같은 카드 안에서 살짝 들여 쓰고 연한 바탕 */
+#detailBody .thread > .reply.child {
+  margin: 0 12px 10px 26px;
+  padding: 8px 10px 4px 12px;
+  border-radius: 0 10px 10px 0;
+  background: #f4f8f3;
+}
+#detailBody .thread > .reply.child.from-ai {
+  background: #fff3e6;
+}
+#detailBody .reply-actions {
+  margin-top: 8px;
+  padding-top: 2px;
+  border-top: 1px dashed #e1e9e2;
+}
+
+/* ── 게시 전 점검: '조금 더 적어 볼래요?' 안내 ── */
+.draft-hint {
+  margin: 0 0 10px;
+  padding: 12px 14px;
+  border: 1px solid #f1d9a6;
+  border-left: 4px solid #e6b44c;
+  border-radius: 12px;
+  background: #fffaf0;
+  color: #5b4718;
+}
+.draft-hint p {
+  margin: 4px 0 6px;
+  line-height: 1.5;
+}
+.draft-hint ul {
+  margin: 0 0 8px;
+  padding-left: 18px;
+  font-size: 13px;
+}
+.draft-hint .row {
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+}
+.draft-hint small {
+  color: #7a6a45;
+}
+
+/* ── 섬지기: 요일·시간대 표시 ── */
+.keeper-moment {
+  display: block;
+  margin-top: 4px;
+  font-size: 12px;
+  font-weight: 700;
+  color: #4f7a64;
+}
+
+/* ══ 고민 상세: [글 + 위로]는 큰 카드 하나로 이어지게, [둘러보기]는 카드 밖에 따로 ══
+   - 글: 작성자 한 줄 → 큰 제목 → 본문 (본문이 가장 먼저 눈에 들어오게)
+   - 위로: 같은 카드의 아랫부분 (연초록 바탕), 위로 하나하나는 흰 카드
+   - 둘러보기: 간격을 크게 두고 파란 계열로 색을 달리 */
+#detailBody {
+  color: #1f3328;
+}
+.detail-topbar {
+  align-items: center;
+  margin-bottom: 8px;
+}
+.detail-crumb {
+  font-size: 15px;
+  color: #2f4a3b;
+}
+
+/* 큰 카드 */
+.talk-card {
+  border: 2px solid #24594f;
+  border-radius: 18px;
+  background: #fff;
+  overflow: hidden;
+  box-shadow: 0 4px 14px rgba(23, 58, 42, 0.1);
+}
+
+/* ① 글 */
+.post-main {
+  padding: 16px 18px 14px;
+}
+.post-author {
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 8px;
+  margin: 0 0 12px;
+}
+.post-author .detail-avatar {
+  width: 30px;
+  height: 30px;
+}
+.post-author strong {
+  font-size: 14px;
+}
+.post-author small {
+  color: #4a5d53;
+  font-size: 12.5px;
+}
+.post-author .badge-row {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.post-main .detail-title {
+  margin: 0 0 10px;
+  color: #13241a;
+  font-size: 22px;
+  line-height: 1.35;
+}
+.post-main .post-text {
+  margin: 0 0 14px;
+  color: #1f3328;
+  font-size: 16px;
+  line-height: 1.75;
+  white-space: pre-wrap;
+}
+.post-foot {
+  align-items: center;
+  gap: 8px;
+  padding-top: 10px;
+  border-top: 1px solid #e6eee7;
+}
+.post-foot .detail-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  color: #4a5d53;
+  font-size: 12.5px;
+}
+.topic-chip {
+  padding: 2px 9px;
+  border-radius: 999px;
+  background: #e7f1ea;
+  color: #24594f;
+  font-weight: 700;
+}
+/* 공감 버튼: 작게 */
+#detailBody .reaction-btn {
+  flex: 0 0 auto;
+  min-height: 34px;
+  padding: 4px 12px;
+  border-radius: 999px;
+  border: 1px solid #cfe0d3;
+  background: #f4f8f3;
+  color: #2c5a45;
+  font-size: 13px;
+  font-weight: 700;
+  box-shadow: none;
+}
+#detailBody .reaction-btn[aria-pressed="true"] {
+  border-color: #f2b8a6;
+  background: #fff1ec;
+  color: #b4441f;
+}
+
+/* ② 위로: 같은 카드의 아랫부분 — 글과 이어지지만 바탕색으로 구분 */
+#detailBody .talk-replies {
+  margin: 0;
+  padding: 14px 16px 16px;
+  border: 0;
+  border-top: 1px solid #cfe0d3;
+  background: #f1f7f2;
+}
+#detailBody .talk-replies > .section-title,
+#detailBody .talk-replies > h3 {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  margin: 0 0 12px;
+  font-size: 15px;
+  font-weight: 800;
+  color: #24594f;
+}
+#detailBody .talk-replies > .section-title .count {
+  padding: 0 8px;
+  border-radius: 999px;
+  background: #24594f;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
+}
+#detailBody .talk-replies .reply p {
+  color: #23362b;
+}
+#detailBody .talk-replies .composer {
+  margin-top: 4px;
+  background: #fff;
+  border: 1px solid #cfe0d3;
+}
+
+/* ③ 둘러보기: 큰 카드 밖, 간격을 크게 두고 파란 계열 */
+#detailBody .browse-zone {
+  margin: 28px 0 6px;
+  padding: 14px 16px 16px;
+  border: 1px solid #d2deeb;
+  border-top: 4px solid #3c6a96;
+  border-radius: 14px;
+  background: #f2f6fb;
+}
+#detailBody .browse-zone > .section-title {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0 0 4px;
+  font-size: 15px;
+  font-weight: 800;
+  color: #2a5785;
+}
+#detailBody .browse-zone > .section-title .count {
+  color: #4a5d6b;
+  font-size: 13px;
+  font-weight: 600;
+}
+#detailBody .browse-zone .section-note {
+  margin: 0 0 10px;
+  color: #4a5d6b;
+}
+#detailBody .browse-zone .similar-card {
+  border-color: #d2deeb;
+}
+#detailBody .browse-zone .similar-card span {
+  color: #3f5048;
+}
+#detailBody .browse-zone .similar-card .go {
+  color: #2a5785;
+}
+#detailBody .browse-zone .similar-card:hover,
+#detailBody .browse-zone .similar-card:focus-visible {
+  border-color: #3c6a96;
+}
+@media (max-width: 480px) {
+  .post-main {
+    padding: 14px 14px 12px;
+  }
+  .post-main .detail-title {
+    font-size: 20px;
+  }
+  #detailBody .talk-replies,
+  #detailBody .browse-zone {
+    padding: 12px;
+  }
+}
+
+/* ── 섬지기 말풍선: 요일 한마디 ↔ 이번 주의 질문 (긴 문장이라 두 줄까지, 넘치면 말줄임) ── */
+.map .keeper .keeper-bubble {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  overflow: hidden;
+  width: max-content;
+  max-width: 170px;
+  padding: 4px 9px 0;
+  border-bottom: 4px solid #fffdf4; /* 아래 여백을 테두리로: 셋째 줄이 여백 사이로 비치지 않게 */
+  white-space: normal;
+  text-align: left;
+  line-height: 1.35;
+  font-size: 11px;
+  font-weight: 700;
+}
+.map .keeper .keeper-bubble[data-kind="ask"] {
+  border-bottom-color: #24594f;
+  background: #24594f;
+  color: #fff;
+}
+
+/* ── 섬지기 창: '많이 힘들 땐'은 접어 두고 눌러서 펼치기 ── */
+.keeper-crisis summary {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  cursor: pointer;
+  font-weight: 800;
+  color: #8a2f22;
+  list-style: none;
+}
+.keeper-crisis summary::-webkit-details-marker {
+  display: none;
+}
+.keeper-crisis summary::after {
+  content: "열기";
+  margin-left: auto;
+  font-size: 12px;
+  font-weight: 700;
+  color: #a5584a;
+}
+.keeper-crisis[open] summary::after {
+  content: "닫기";
+}
+.keeper-crisis summary small {
+  font-weight: 600;
+  color: #a5584a;
+}
+.keeper-crisis[open] summary {
+  margin-bottom: 8px;
+}
+
+/* ── 내 프로필 패널(알림·내 고민·칭호 도감): 데스크톱에서도 화면 아래로 넘치지 않게, 길면 패널 안에서 스크롤 ── */
+#personal.personal {
+  max-height: calc(100dvh - 150px);
+  overflow: auto;
+  overscroll-behavior: contain;
+}
+
+/* ───────── 섬 고민 리포트 (섬지기 창의 두 번째 탭) ───────── */
+.keeper-dialog { overflow-y: auto; }
+.keeper-tabs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px;
+  padding: 4px;
+  border-radius: 12px;
+  background: #e4eee5;
+}
+.keeper-tabs button {
+  min-height: 36px;
+  border: 0;
+  border-radius: 9px;
+  background: transparent;
+  color: #3d6b55;
+  font-weight: 800;
+  cursor: pointer;
+}
+.keeper-tabs button[aria-selected="true"] {
+  background: #fff;
+  color: #1f3d2c;
+  box-shadow: 0 1px 4px #1f3d2c22;
+}
+.keeper-panel { display: grid; gap: 10px; }
+.keeper-panel[hidden] { display: none; }
+.keeper-card h3 small {
+  margin-left: 4px;
+  color: #6b8577;
+  font-size: 11px;
+  font-weight: 600;
+}
+.report-empty {
+  margin: 0;
+  padding: 24px 12px;
+  text-align: center;
+  color: #4d6b5a;
+  line-height: 1.6;
+}
+.report-summary { background: linear-gradient(135deg, #eef8f1, #ffffff); border-color: #cfe5d5; }
+.report-lines { display: grid; gap: 6px; margin: 0; padding: 0; list-style: none; }
+.report-lines li {
+  position: relative;
+  padding-left: 14px;
+  line-height: 1.5;
+  font-size: 14px;
+  color: #22392b;
+}
+.report-lines li::before {
+  content: "";
+  position: absolute;
+  left: 2px;
+  top: .6em;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #2f7d5b;
+}
+.report-bars { display: grid; gap: 6px; margin: 0; padding: 0; list-style: none; }
+.report-bar {
+  display: grid;
+  grid-template-columns: minmax(96px, 44%) 1fr 38px;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+}
+.report-bar-label { line-height: 1.3; color: #2c4637; }
+.report-bar-track { height: 10px; border-radius: 6px; background: #edf2ee; overflow: hidden; }
+.report-bar-track i { display: block; height: 100%; border-radius: 6px; background: #2f7d5b; }
+.report-bar b { text-align: right; color: #1f3d2c; }
+.report-stack {
+  display: flex;
+  height: 12px;
+  margin-top: 12px;
+  border-radius: 6px;
+  overflow: hidden;
+  gap: 2px;
+}
+.report-stack i, .report-legend i { display: block; }
+.c0 { background: #2f7d5b; }
+.c1 { background: #e59a3a; }
+.c2 { background: #5b7fd1; }
+.c3 { background: #c2668a; }
+.report-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  margin: 8px 0 0;
+  font-size: 12px;
+  color: #4d6b5a;
+}
+.report-legend span { display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; }
+.report-legend i { width: 9px; height: 9px; border-radius: 3px; }
+.report-picks { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.report-pick, .report-group {
+  display: grid;
+  gap: 4px;
+  justify-items: start;
+  padding: 10px 12px;
+  border: 1px solid #e1ebe1;
+  border-radius: 14px;
+  background: #fff;
+  color: #22392b;
+  text-align: left;
+  cursor: pointer;
+}
+.report-pick small, .report-group small { color: #6b8577; font-size: 11px; font-weight: 700; }
+.report-pick strong, .report-group strong {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  font-size: 14px;
+  line-height: 1.4;
+}
+.report-pick.warm { border-color: #f1d9b4; background: #fff8ec; }
+.report-pick.warm small { color: #a8641a; }
+.report-pick.wait { border-color: #cfe0f5; background: #f3f8ff; }
+.report-pick.wait small { color: #3d64a8; }
+.report-pick:hover, .report-group:hover { border-color: #2f7d5b; }
+.report-groups { display: grid; gap: 6px; }
+.report-me p { margin: 0 0 8px; line-height: 1.5; }
+.report-me .wide { margin-top: 8px; }
+.report-days {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  align-items: end;
+  gap: 6px;
+  height: 84px;
+}
+.report-days span {
+  display: grid;
+  grid-template-rows: 1fr auto;
+  align-items: end;
+  height: 100%;
+  text-align: center;
+}
+.report-days i { display: block; width: 100%; border-radius: 6px 6px 2px 2px; background: #8fc4a5; }
+.report-days b { margin-top: 4px; font-size: 12px; color: #4d6b5a; }
+.report-jobs { display: grid; gap: 4px; margin: 0; padding: 0; list-style: none; }
+.report-jobs li {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 8px;
+  align-items: center;
+  padding: 6px 8px;
+  border-radius: 10px;
+  font-size: 13px;
+}
+.report-jobs li.here { background: #eef8f1; }
+.report-jobs li.here b::after { content: " (여기)"; color: #2f7d5b; font-size: 11px; }
+.report-jobs small { color: #6b8577; font-weight: 700; }
+@media (max-width: 420px) {
+  .report-picks { grid-template-columns: 1fr; }
 }

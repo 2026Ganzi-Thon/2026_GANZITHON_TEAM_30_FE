@@ -33,7 +33,7 @@ const CHARACTER_COLORS = [
 const PERSONAS = {
   empathy: {
     icon: "💗",
-    label: "무조건 공감형",
+    label: "긍정적 공감형",
     animals: ["rabbit", "sheep", "pig", "dog"],
   },
   experience: {

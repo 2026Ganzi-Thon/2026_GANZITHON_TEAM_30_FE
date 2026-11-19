@@ -355,8 +355,8 @@ async function renderFeed() {
             ${escapeText(ways[way] || "")} ·
             ${escapeText(new Date(post.created_at).toLocaleString("ko-KR"))}
           </small>
-          <strong>${escapeText(post.title)}${post.waiting ? '<span class="waiting-badge">답을 기다려요</span>' : ""}</strong>
-          <small>${escapeText(post.author?.nickname || "떠난 이용자")}</small>
+          <strong>${post.waiting ? '<span class="waiting-badge">답을 기다려요</span>' : ""}${escapeText(post.title)}</strong>
+          <small>${escapeText(post.author?.nickname || "떠난 이용자")} ${(post.author?.title?.tier || 0) >= 3 ? titleBadge(post.author.title, { compact: true }) : ""}</small>
           <small>
             ${escapeText(post.topic)} · 답글 ${post.comment_count}
           </small>
@@ -377,6 +377,7 @@ async function renderFeed() {
 
 // ───────── 지도: 이웃 배치 · 실시간 접속 · 공명 · 모닥불 · 방향키 ─────────
 const clusterPoint = { x: 31, y: 57 };
+const MAX_ZOOM = 2; // 지도 확대는 100~200%: 더 키우면 캐릭터·말풍선이 깨지고 길을 잃기 쉬움
 const revealZoom = 0; // 이웃을 숫자로 묶지 않고 항상 각자 자리에 보여 줌
 const campfirePoint = { x: 50, y: 44 }; // 섬 중앙 광장
 // 강·호수·집을 피한 풀밭 자리(%). 글 위치가 없는 이웃은 이 중 한 곳에 선다
@@ -421,9 +422,11 @@ async function loadNeighbors() {
       throw new Error('섬 선택 화면에서 다시 입장해주세요.');
     }
 
+    const firstLoad = !serverNeighbors.length;
     serverNeighbors = await api(`/islands/${islandId}/neighbors`);
     updateIslandCounts();
     renderMarkers();
+    if (firstLoad) followPlayer(); // 처음 들어오면 내 캐릭터가 보이는 곳에서 시작 (좁은 휴대폰 화면)
     loadResonance();
   } catch (error) {
     toast(error.message);
@@ -433,19 +436,41 @@ async function loadNeighbors() {
 function updateIslandCounts() {
   const online = onlineNeighbors.size;
   document.querySelectorAll(".island-counts").forEach(element => {
-    element.textContent =
-      `지도에 표시된 이웃: ${serverNeighbors.length}명` +
-      (online ? ` · 지금 접속 ${online + 1}명` : "") +
-      (footprintVisitors ? ` · 오늘 다녀간 이웃 ${footprintVisitors}명` : "");
+    // 항목마다 span으로 나눠, 좁은 화면에서는 항목 단위로 줄을 바꾼다 (말줄임으로 잘리지 않게)
+    const items = [
+      `지도에 표시된 이웃 ${Number(serverNeighbors.length)}명`,
+      online ? `지금 접속 ${Number(online) + 1}명` : "",
+      footprintVisitors ? `오늘 다녀간 이웃 ${Number(footprintVisitors)}명` : "",
+    ].filter(Boolean);
+    element.innerHTML = items.map(text => `<span>${escapeText(text)}</span>`).join("");
     element.title = "공개 글을 작성한 이웃과 지금 섬을 돌아다니는 이웃";
   });
 }
 
-// 이름표: 페르소나 아이콘 + 닉네임 (+ 접속 중 점)
-const nameTag = (author, cls, online = false) => `
+// 활동 칭호 배지. 등급(1 새싹 · 2 따뜻한 · 3 빛나는 · 4 전설)마다 모양이 달라지고, 3등급부터 반짝임
+// 성격 배지: 이모지 없이 이름만 (api.js의 PERSONAS 라벨을 그대로 씀)
+const personaChip = (character) => {
+  const key = personaKeyOf(character);
+  return key ? `<span class="persona-badge persona-${key}">${escapeText(PERSONAS[key].label)}</span>` : "";
+};
+
+const titleBadge = (title, { compact = false } = {}) =>
+  title
+    ? `<span class="title-badge tier-${Number(title.tier)}" title="${escapeText(title.tier_name)} 칭호 · ${escapeText(title.desc)}">${compact ? escapeText(title.icon) : escapeText(title.name)}</span>`
+    : "";
+
+// 실시간 접속 정보에는 칭호가 없으니, 이웃 목록에서 같은 사람의 칭호를 찾아 씀
+const titleOf = (author) =>
+  author?.title || serverNeighbors.find((n) => n.author.user_id === author?.user_id)?.author.title || null;
+
+// 이름표: 페르소나 아이콘 + 닉네임 (+ 접속 중 점) + 빛나는 칭호 아이콘(3등급 이상)
+const nameTag = (author, cls, online = false) => {
+  const title = titleOf(author);
+  return `
   <span class="${cls}">
-    ${online ? '<i class="online-dot" aria-label="접속 중"></i>' : ""}${escapeText(personaOf(author.character)?.icon || "")} ${escapeText(author.nickname)}
+    ${online ? '<i class="online-dot" aria-label="접속 중"></i>' : ""}${escapeText(personaOf(author.character)?.icon || "")} ${escapeText(author.nickname)}${title && title.tier >= 3 ? " " + titleBadge(title, { compact: true }) : ""}
   </span>`;
+};
 
 const characterImg = (author, alt = "") => `
   <img class="${toneClass(author.color)}"
@@ -454,7 +479,7 @@ const characterImg = (author, alt = "") => `
 function renderMarkers() {
   const mine = serverNeighbors.find(neighbor => neighbor.is_me);
   const others = serverNeighbors.filter(neighbor => !neighbor.is_me);
-  const items = [...footprintItems(), ...bottleItem()];
+  const items = [...footprintItems(), ...bottleItem(), ...keeperItem()];
 
   // 섬 중앙 모닥불 (섬 온도)
   if (islandTemp) {
@@ -665,13 +690,16 @@ function setupWorldGuide() {
   guide.setAttribute("aria-labelledby", "worldGuideTitle");
   guide.innerHTML = `
     <form method="dialog">
-      <h2 id="worldGuideTitle">섬에 오신 걸 환영해요</h2>
+      <div class="guide-keeper">${keeperSvg(56)}<p><b>섬지기</b>예요. 섬에 오신 걸 환영해요!<br><small>섬을 둘러보는 방법을 알려 드릴게요.</small></p></div>
+      <h2 id="worldGuideTitle" class="sr-only">섬에 오신 걸 환영해요</h2>
       <ul>
         <li><b>움직이기</b> 방향키·WASD 또는 지도를 눌러 내 캐릭터를 옮겨요. 초록 점이 있는 이웃은 지금 접속 중이에요.</li>
         <li><b>고민 놓기</b> 고민을 쓰면 내 캐릭터가 서 있던 자리에 글 말풍선이 남아요.</li>
         <li><b>공명</b> 나와 닮은 고민을 쓴 이웃이 내 곁으로 다가와요.</li>
         <li><b>모닥불</b> 고민과 위로가 쌓일수록 섬이 따뜻해져요. 목표는 36.5°예요.</li>
-        <li><b>칭호</b> 캐릭터마다 위로 성향 칭호가 댓글에 붙어요.</li>
+        <li><b>유리병 편지</b> 강물에 떠내려온 병을 열면 다른 섬의 고민과 그 뒤 이야기가 들어 있어요.</li>
+        <li><b>칭호</b> 캐릭터마다 위로 성향이 있고, 위로를 건넬수록 활동 칭호가 자라요. 프로필의 칭호 도감에서 볼 수 있어요.</li>
+        <li><b>섬지기</b> 광장의 섬지기를 누르면 이번 주의 질문, 섬 소식, 이용 원칙을 볼 수 있어요.</li>
       </ul>
       <button value="ok" class="wide">둘러보기</button>
     </form>`;
@@ -837,6 +865,284 @@ function bottleItem() {
   }];
 }
 
+// ── 섬지기: 섬의 규칙·안전·소식을 맡는 운영자 캐릭터 (위로는 온도와 이웃이, 섬지기는 댓글을 달지 않음) ──
+const keeperPoint = { x: 77, y: 56 }; // 강 오른쪽 집 앞 (섬지기의 집)
+let keeper = null;
+
+// 섬지기 그림 (선장 모자 + 등불을 든 작은 지기)
+// 받침이 있으면 "이에요", 없으면 "예요" (예: 워라밸이에요 / 업무량·스트레스예요)
+// 마지막 글자에 받침이 있나 → 이에요/예요, 은/는
+function hasFinal(word) {
+  const code = String(word).charCodeAt(String(word).length - 1);
+  return code >= 0xac00 && code <= 0xd7a3 && (code - 0xac00) % 28 !== 0;
+}
+const copula = (word) => (hasFinal(word) ? "이에요" : "예요");
+const topicMark = (word) => (hasFinal(word) ? "은" : "는");
+
+const keeperSvg = (size = 56) => `
+  <svg class="keeper-art" width="${size}" height="${size}" viewBox="0 0 64 64" aria-hidden="true">
+    <ellipse cx="32" cy="59" rx="15" ry="3.5" fill="#00000022"/>
+    <path d="M18 56c0-12 6-20 14-20s14 8 14 20z" fill="#2f6f8f"/>
+    <path d="M26 38h12l-2 6h-8z" fill="#f4e3c3"/>
+    <circle cx="32" cy="27" r="11" fill="#ffe2c4"/>
+    <circle cx="28" cy="27.5" r="1.4" fill="#3a2a20"/>
+    <circle cx="36" cy="27.5" r="1.4" fill="#3a2a20"/>
+    <path d="M29 31.5q3 2.4 6 0" stroke="#c46a4a" stroke-width="1.4" fill="none" stroke-linecap="round"/>
+    <circle cx="25.5" cy="30.5" r="2" fill="#f7b3a2" opacity=".7"/>
+    <circle cx="38.5" cy="30.5" r="2" fill="#f7b3a2" opacity=".7"/>
+    <path d="M19 21c2-8 24-8 26 0z" fill="#ffffff" stroke="#24594f" stroke-width="1.6"/>
+    <rect x="18" y="20" width="28" height="4" rx="2" fill="#24594f"/>
+    <path d="M30 14.5l2-2 2 2-2 2z" fill="#f2c14e"/>
+    <path d="M46 44v8" stroke="#6b4a2b" stroke-width="2" stroke-linecap="round"/>
+    <rect x="42.5" y="46" width="7" height="9" rx="2" fill="#f2c14e" stroke="#b7791f" stroke-width="1.2"/>
+    <circle class="keeper-glow" cx="46" cy="50.5" r="7" fill="#ffd56b" opacity=".35"/>
+  </svg>`;
+
+// 섬지기 말풍선: 요일·시간대 한마디와 이번 주의 질문을 몇 초마다 번갈아 보여 줌
+const KEEPER_BUBBLE_MS = 7000;
+let keeperPhase = 0; // 짝수 = 한마디, 홀수 = 이번 주의 질문
+let keeperTimer = null;
+const keeperBubble = () =>
+  keeperPhase % 2 === 0
+    ? { text: keeper.greeting, cls: "say" }
+    : { text: `이번 주의 질문 · ${keeper.question.text}`, cls: "ask" };
+
+function rotateKeeperBubble() {
+  if (!keeper) return;
+  keeperPhase += 1;
+  const { text, cls } = keeperBubble();
+  document.querySelectorAll(".keeper-bubble").forEach((bubble) => {
+    bubble.textContent = text;
+    bubble.dataset.kind = cls;
+  });
+}
+
+async function loadKeeper() {
+  if (!Number.isInteger(islandId)) return;
+  try {
+    keeper = await api(`/islands/${islandId}/keeper`);
+  } catch {
+    keeper = null; // 이전 서버면 섬지기 없이
+  }
+  renderMarkers();
+  if (keeper && !keeperTimer) keeperTimer = setInterval(rotateKeeperBubble, KEEPER_BUBBLE_MS);
+}
+
+function keeperItem() {
+  if (!keeper) return [];
+  const bubble = keeperBubble();
+  return [{
+    key: "keeper",
+    ...keeperPoint,
+    html: `
+      <button type="button" class="marker keeper" data-keeper aria-label="섬지기: 오늘의 한마디, 이번 주의 질문, 섬 소식 보기">
+        <span class="keeper-bubble" data-kind="${bubble.cls}" aria-hidden="true">${escapeText(bubble.text)}</span>
+        ${keeperSvg(52)}
+        <span class="keeper-name">섬지기</span>
+      </button>`,
+  }];
+}
+
+async function openKeeper() {
+  let dialog = el("keeperDialog");
+  if (!dialog) {
+    dialog = document.createElement("dialog");
+    dialog.id = "keeperDialog";
+    dialog.className = "keeper-dialog";
+    dialog.setAttribute("aria-labelledby", "keeperTitle");
+    document.body.append(dialog);
+  }
+  try {
+    keeper = await api(`/islands/${islandId}/keeper`); // 열 때마다 최신 소식
+  } catch (error) {
+    if (!keeper) return toast(error.message);
+  }
+  const k = keeper;
+  const w = k.week;
+  const stat = (num, label) => `<div class="keeper-stat"><b>${Number(num)}</b><span>${label}</span></div>`;
+  dialog.innerHTML = `
+    <form method="dialog" class="keeper-paper">
+      <div class="keeper-head">
+        ${keeperSvg(72)}
+        <div>
+          <h2 id="keeperTitle">${escapeText(k.name)} <small class="keeper-role">섬 운영</small></h2>
+          ${k.moment ? `<small class="keeper-moment">${escapeText(k.moment)}의 한마디</small>` : ""}
+          <p class="keeper-say">${escapeText(k.greeting)}</p>
+        </div>
+      </div>
+
+      <div class="keeper-tabs" role="tablist">
+        <button type="button" role="tab" aria-selected="true" data-keeper-tab="news">섬 소식</button>
+        <button type="button" role="tab" aria-selected="false" data-keeper-tab="report">섬 고민 리포트</button>
+      </div>
+      <div class="keeper-panel" data-keeper-panel="report" hidden></div>
+      <div class="keeper-panel" data-keeper-panel="news">
+      <section class="keeper-card keeper-question">
+        <h3>이번 주의 질문</h3>
+        <p>“${escapeText(k.question.text)}”</p>
+        <button type="button" id="keeperWrite">이 질문으로 고민 나누기</button>
+      </section>
+
+      <section class="keeper-card">
+        <h3>최근 ${Number(w.days)}일 섬 소식</h3>
+        <div class="keeper-stats">
+          ${stat(w.posts, "나눈 고민")}
+          ${stat(w.comforts, "이웃의 위로")}
+          ${stat(w.ai_comforts, "온도의 위로")}
+          ${stat(w.thanks, "받은 고마움")}
+          ${stat(w.visitors, "다녀간 이웃")}
+        </div>
+        ${w.top_topic ? `<p class="keeper-note">이번 주에 가장 많이 나눈 고민은 <b>${escapeText(w.top_topic)}</b>${copula(w.top_topic)}.</p>` : ""}
+      </section>
+
+      <section class="keeper-card">
+        <h3>섬 이용 원칙</h3>
+        <ul class="keeper-rules">${k.rules.map((rule) => `<li>${escapeText(rule)}</li>`).join("")}</ul>
+      </section>
+
+      <details class="keeper-card keeper-crisis">
+        <summary>많이 힘들 땐 <small>상담 전화 보기</small></summary>
+        <p>${escapeText(k.crisis_support.message)}</p>
+        <div class="row">
+          ${k.crisis_support.resources.map((r) => `<a class="keeper-call" href="tel:${escapeText(r.phone)}">${escapeText(r.name)} <b>${escapeText(r.phone)}</b> <small>${escapeText(r.hours)}</small></a>`).join("")}
+        </div>
+      </details>
+      </div>
+
+      <p class="keeper-foot">섬지기는 댓글을 달지 않아요. 위로는 온도와 이웃들이, 규칙과 안전은 섬지기가 맡아요.</p>
+      <button value="close" class="soft wide">닫기</button>
+    </form>`;
+  dialog.querySelector("#keeperWrite").onclick = () => {
+    dialog.close();
+    editor();
+    if (k.question.topic) {
+      selectedTopic = k.question.topic;
+      updateTopicSelection();
+    }
+    el("body").placeholder = `섬지기의 질문: ${k.question.text}`;
+  };
+  // 탭: 섬 소식 ↔ 섬 고민 리포트 (리포트는 처음 열 때 불러옴)
+  dialog.querySelectorAll("[data-keeper-tab]").forEach((tab) => {
+    tab.onclick = () => {
+      const name = tab.dataset.keeperTab;
+      dialog.querySelectorAll("[data-keeper-tab]").forEach((t) => t.setAttribute("aria-selected", String(t === tab)));
+      dialog.querySelectorAll("[data-keeper-panel]").forEach((panel) => { panel.hidden = panel.dataset.keeperPanel !== name; });
+      if (name === "report") loadInsights(dialog.querySelector('[data-keeper-panel="report"]'), dialog);
+    };
+  });
+  dialog.showModal();
+}
+
+// ───────── 섬 고민 리포트: 쌓인 공개 고민 분석 (GET /islands/{id}/insights) ─────────
+const DAY_SHORT = ["월", "화", "수", "목", "금", "토", "일"];
+const percent = (ratio) => `${Math.round(Number(ratio) * 100)}%`;
+
+async function loadInsights(panel, dialog) {
+  panel.innerHTML = `<p class="report-empty">섬에 쌓인 고민을 살펴보는 중이에요…</p>`;
+  let d;
+  try {
+    d = await api(`/islands/${islandId}/insights`);
+  } catch (error) {
+    panel.innerHTML = `<p class="report-empty">${escapeText(error.message)}</p>`;
+    return;
+  }
+  panel.innerHTML = renderInsights(d);
+  // 리포트 속 고민 카드를 누르면 그 글로 이동
+  panel.querySelectorAll("[data-report-post]").forEach((button) => {
+    button.onclick = () => {
+      dialog.close();
+      showPost(Number(button.dataset.reportPost));
+    };
+  });
+}
+
+function renderInsights(d) {
+  if (!d.enough) {
+    return `<p class="report-empty">아직 이 섬에 공개 고민이 ${Number(d.total_posts)}개예요.<br>
+      ${Number(d.min_posts)}개가 넘게 쌓이면 어떤 고민이 많은지 정리해 드릴게요.</p>`;
+  }
+  const bar = (item, max) => `
+    <li class="report-bar">
+      <span class="report-bar-label">${escapeText(item.label)}</span>
+      <span class="report-bar-track"><i style="width:${Math.max(4, (item.count / max) * 100)}%"></i></span>
+      <b>${percent(item.ratio)}</b>
+    </li>`;
+  const pick = (item, kind) => item ? `
+    <button type="button" class="report-pick ${kind}" data-report-post="${Number(item.post_id)}">
+      <small>${kind === "warm" ? `오늘 공감이 모인 고민 · 공감 ${Number(item.count)}` : "아직 답을 기다리는 고민"}</small>
+      <strong>${escapeText(item.title)}</strong>
+      <span class="topic-chip">${escapeText(item.topic)}</span>
+    </button>` : "";
+  const maxTopic = Math.max(...d.topics.map((t) => t.count), 1);
+  const maxDay = Math.max(...d.time.days, 1);
+  const me = d.me;
+  return `
+    <section class="keeper-card report-summary">
+      <h3>한눈에 보기 <small>공개 고민 ${Number(d.total_posts)}개 · 이번 주 ${Number(d.week_posts)}개</small></h3>
+      <ul class="report-lines">${d.headlines.map((line) => `<li>${escapeText(line)}</li>`).join("")}</ul>
+    </section>
+
+    ${d.warmest || d.waiting ? `<section class="report-picks">${pick(d.warmest, "warm")}${pick(d.waiting, "wait")}</section>` : ""}
+
+    <section class="keeper-card">
+      <h3>많이 나눈 고민 <small>주제 ${Number(d.topic_kinds)}가지 중 상위</small></h3>
+      <ul class="report-bars">${d.topics.map((t) => bar(t, maxTopic)).join("")}</ul>
+      <div class="report-stack" aria-label="큰 분류별 비율">
+        ${d.categories.map((c, i) => `<i class="c${i % 4}" style="flex:${c.count}" title="${escapeText(c.label)} ${percent(c.ratio)}"></i>`).join("")}
+      </div>
+      <p class="report-legend">${d.categories.map((c, i) => `<span><i class="c${i % 4}"></i>${escapeText(c.label)} ${percent(c.ratio)}</span>`).join("")}</p>
+    </section>
+
+    ${d.groups.length ? `
+    <section class="keeper-card">
+      <h3>결이 닮은 고민 묶음 <small>내용이 비슷한 글끼리 AI가 묶었어요</small></h3>
+      <div class="report-groups">
+        ${d.groups.map((g) => `
+          <button type="button" class="report-group" data-report-post="${Number(g.post_id)}">
+            <strong>${escapeText(g.title)}</strong>
+            <small>닮은 고민 ${Number(g.size)}개 · 평균 유사도 ${percent(g.similarity)} · ${escapeText(g.topic)}</small>
+          </button>`).join("")}
+      </div>
+    </section>` : ""}
+
+    ${me ? `
+    <section class="keeper-card report-me">
+      <h3>내 고민과 공명</h3>
+      <p>내 최근 고민 <b>‘${escapeText(me.title)}’</b></p>
+      ${me.similar_posts ? `
+      <div class="keeper-stats">
+        <div class="keeper-stat"><b>${Number(me.similar_posts)}</b><span>닮은 고민</span></div>
+        <div class="keeper-stat"><b>${Number(me.neighbors)}</b><span>공명하는 이웃</span></div>
+        <div class="keeper-stat"><b>${percent(me.top_similarity)}</b><span>가장 닮은 정도</span></div>
+      </div>` : `<p class="keeper-note">아직 이 섬엔 꼭 닮은 고민이 없어요. 처음 꺼낸 이야기일 수 있어요. 비슷한 마음의 이웃이 오면 공명으로 알려 드릴게요.</p>`}
+      ${me.topic_rank ? `<p class="keeper-note">내 주제 <b>${escapeText(me.topic)}</b>${topicMark(me.topic)} ${me.topic_rank === 1 ? "이 섬에서 가장 많이 나눈 고민이에요" : `이 섬에서 ${Number(me.topic_rank)}번째로 많아요`}. 혼자만의 고민이 아니에요.</p>` : ""}
+      <button type="button" class="soft wide" data-report-post="${Number(me.post_id)}">닮은 고민 보러 가기</button>
+    </section>` : ""}
+
+    <section class="keeper-card">
+      <h3>언제 고민이 올라오나 ${d.time.busiest && d.time.busiest_count >= 2 ? `<small>가장 많은 때: ${escapeText(d.time.busiest)}</small>` : ""}</h3>
+      <div class="report-days">
+        ${d.time.days.map((n, i) => `<span><i style="height:${Math.max(6, (n / maxDay) * 100)}%"></i><b>${DAY_SHORT[i]}</b></span>`).join("")}
+      </div>
+      <p class="report-legend">${d.time.slots.map((s) => `<span>${escapeText(s.label)} ${percent(s.ratio)}</span>`).join("")}</p>
+    </section>
+
+    <section class="keeper-card">
+      <h3>바라는 위로</h3>
+      <ul class="report-bars">${d.comfort.map((c) => bar(c, Math.max(...d.comfort.map((x) => x.count), 1))).join("")}</ul>
+    </section>
+
+    ${d.jobs.length ? `
+    <section class="keeper-card">
+      <h3>직무섬마다 많은 고민</h3>
+      <ul class="report-jobs">
+        ${d.jobs.map((j) => `<li class="${j.island_id === d.island_id ? "here" : ""}"><b>${escapeText(j.island_name)}</b><span>${escapeText(j.topic)}</span><small>${percent(j.ratio)}</small></li>`).join("")}
+      </ul>
+    </section>` : ""}
+
+    <p class="keeper-foot">공개 고민만 모아 셌어요. 글 내용은 리포트에 쓰지 않고, 닮은 정도는 고민을 AI 임베딩으로 바꿔 잰 코사인 유사도예요.</p>`;
+}
+
 function openBottle() {
   if (!bottle) return;
   const letter = bottle;
@@ -853,7 +1159,7 @@ function openBottle() {
     <form method="dialog" class="bottle-paper">
       <p class="bottle-from">${escapeText(letter.island_name)}에서 떠내려온 편지 · ${when}</p>
       <h2 id="bottleTitle">${escapeText(letter.title)}</h2>
-      <p class="bottle-author">${escapeText(letter.author.nickname)} ${personaBadge(letter.author.character)}</p>
+      <p class="bottle-author">${escapeText(letter.author.nickname)} ${personaChip(letter.author.character)}</p>
       <p class="bottle-body">${escapeText(letter.content)}</p>
       ${letter.follow_up ? `
         <div class="bottle-story">
@@ -923,6 +1229,9 @@ const moveKeys = {
 };
 const heldKeys = new Set();
 let moveFrame = null;
+// 지도 그림이 화면보다 넓어서, 캐릭터가 화면 밖으로 걸어가면 카메라(지도)가 따라가게 한다.
+// 실제 동작은 지도 끌기 코드가 있는 곳에서 채운다 (dx·dy·positionMap이 그 안에 있음).
+let followPlayer = () => {};
 let lastMoveTime = 0;
 
 const isTyping = (target) =>
@@ -958,6 +1267,7 @@ function stepPlayer(time) {
     player.style.left = state.player.x + "%";
     player.style.top = state.player.y + "%";
   }
+  followPlayer();
   moveFrame = requestAnimationFrame(stepPlayer);
 }
 
@@ -1003,8 +1313,14 @@ const commentName = (comment) =>
   comment.is_ai ? "온도 · AI 이웃" : comment.author?.nickname || "떠난 이용자";
 
 // 댓글 하나 그리기 (답글이면 child 클래스로 한 단계 들여쓰기)
+// 온도(AI)·내 댓글은 모양을 구분하고, 버튼은 작은 글자 링크로 (위로 내용이 먼저 보이게)
 function renderComment(comment, post, child = false) {
-  const cls = child ? "reply child" : "reply";
+  const cls = [
+    "reply",
+    child ? "child" : "",
+    comment.is_ai ? "from-ai" : "",
+    comment.is_mine && !comment.is_ai ? "mine" : "",
+  ].filter(Boolean).join(" ");
 
   // 가려진·삭제된 댓글은 이름·아바타·버튼 없이 안내 문구만
   if (comment.is_hidden || comment.is_deleted) {
@@ -1026,31 +1342,36 @@ function renderComment(comment, post, child = false) {
 
   return `
     <div class="${cls}">
-      <strong>
-        <img class="reply-avatar ${comment.is_ai ? "" : toneClass(comment.author?.color)}" src="${avatar}" alt="">${escapeText(commentName(comment))}
-        ${comment.is_ai ? "" : personaBadge(comment.author?.character)}
-      </strong>
+      <div class="reply-head">
+        <img class="reply-avatar ${comment.is_ai ? "" : toneClass(comment.author?.color)}" src="${avatar}" alt="">
+        <strong>${escapeText(commentName(comment))}</strong>
+        ${comment.is_mine && !comment.is_ai ? `<span class="me-tag">나</span>` : ""}
+        ${comment.is_ai ? "" : titleBadge(comment.author?.title) + personaChip(comment.author?.character)}
+      </div>
       <p>${escapeText(comment.content)}</p>
-      <div class="row reply-actions">
-        ${canReply ? `<button type="button" class="soft" data-reply-to="${comment.id}">답글</button>` : ""}
-        ${canThank ? `<button type="button" class="soft" data-thank-comment="${comment.id}" aria-pressed="${comment.thanked}">${comment.thanked ? "♥ 고마워요" : "♡ 고마워요"}</button>` : ""}
-        ${canReport ? `<button type="button" class="soft" data-report-comment="${comment.id}">신고</button>` : ""}
-        ${canDelete ? `<button type="button" class="soft" data-delete-comment="${comment.id}">삭제</button>` : ""}
+      <div class="reply-actions">
+        ${canThank ? `<button type="button" class="link-btn thank-btn" data-thank-comment="${comment.id}" aria-pressed="${comment.thanked}">${comment.thanked ? "♥ 고마워요" : "♡ 고마워요"}</button>` : ""}
+        ${canReply ? `<button type="button" class="link-btn" data-reply-to="${comment.id}">답글</button>` : ""}
+        ${canReport ? `<button type="button" class="link-btn quiet" data-report-comment="${comment.id}">신고</button>` : ""}
+        ${canDelete ? `<button type="button" class="link-btn quiet" data-delete-comment="${comment.id}">삭제</button>` : ""}
       </div>
     </div>`;
 }
 
-// 댓글을 루트 + 답글(한 단계)로 묶어서 그리기
+// 댓글을 루트 + 답글(한 단계)로 묶어서 그리기. 한 묶음(thread)씩 감싸서 대화 단위가 보이게
 function renderComments(comments, post) {
   const roots = comments.filter((c) => !c.parent_id);
   const childrenOf = (id) => comments.filter((c) => c.parent_id === id);
+  if (!roots.length) {
+    return `<p class="empty-replies">아직 위로가 없어요. 첫 위로를 남겨 주세요.</p>`;
+  }
   return roots
     .map(
-      (root) =>
-        renderComment(root, post) +
-        childrenOf(root.id)
-          .map((c) => renderComment(c, post, true))
-          .join(""),
+      (root) => `
+      <div class="thread">
+        ${renderComment(root, post)}
+        ${childrenOf(root.id).map((c) => renderComment(c, post, true)).join("")}
+      </div>`,
     )
     .join("");
 }
@@ -1117,7 +1438,7 @@ async function report(targetType, targetId, button) {
       method: "POST",
       body: { target_type: targetType, target_id: targetId, reason },
     });
-    toast("신고가 접수됐어요. 확인 후 조치할게요");
+    toast("신고가 접수됐어요. 섬지기가 확인할게요");
   } catch (error) {
     alert(error.message);
   } finally {
@@ -1139,7 +1460,7 @@ async function appeal(targetType, targetId, button) {
       method: "POST",
       body: { target_type: targetType, target_id: targetId, reason },
     });
-    toast("이의 제기를 보냈어요. 운영진이 확인할게요");
+    toast("이의 제기를 보냈어요. 섬지기가 다시 살펴볼게요");
   } catch (error) {
     // 409(이미 이의를 제기함) 등은 서버 문구 그대로
     toast(error.message);
@@ -1158,15 +1479,17 @@ async function renderSimilar(postId) {
     }
     const items = similarCache.get(postId).slice(0, 3);
     if (el("similarPosts") !== box || !items.length) return;
+    // 댓글과 헷갈리지 않게: 구역 설명 + "다른 글로 이동"하는 링크 카드 모양
     box.innerHTML = `
-      <h3>비슷한 고민을 먼저 겪은 이웃들</h3>
+      <h3 class="section-title">둘러보기 <span class="count">비슷한 고민을 먼저 겪은 이웃들</span></h3>
+      <p class="section-note">이 글과 비슷한 다른 이웃의 고민이에요. 누르면 그 글로 이동해요.</p>
       ${items
         .map(
           (item) => `
         <button type="button" class="similar-card" data-similar="${item.id}">
           <strong>${escapeText(item.title)}</strong>
           <span>${escapeText(item.preview || "")}</span>
-          <small>답글 ${item.comment_count}</small>
+          <small><span>위로 ${item.comment_count}</span><span class="go">읽어 보기 →</span></small>
         </button>`,
         )
         .join("")}`;
@@ -1232,64 +1555,64 @@ async function showPost(id, open = true) {
       aiReplyCount(comments) <= aiPending.baseline;
     const draftText = el("reply")?.value || "";
 
+    // 구역 ① 고민 본문: 흰 카드. 신고·차단·수정·삭제는 오른쪽 위 "⋯" 메뉴 안으로
     el("detailBody").innerHTML = `
-      <div class="between">
-        <div class="row">
-          <img class="detail-avatar ${toneClass(author?.color)}" src="${img(animal)}" alt="">
-          <div>
-            <strong>${escapeText(nickname)}</strong>
-            ${personaBadge(author?.character)}
-            <small>
-              ${escapeText(author?.job || "")}
-              ${escapeText(post.years || "")}
-            </small>
-          </div>
+      <div class="between detail-head detail-topbar">
+        <strong class="detail-crumb">고민 읽기</strong>
+        <div class="row detail-tools">
+          <details class="more-menu">
+            <summary aria-label="더 보기 (${post.is_mine ? "수정·삭제" : "신고·차단"})" title="더 보기">⋯</summary>
+            <div class="more-list">
+              ${post.is_mine ? `
+                <button type="button" id="editServerPost">고민 수정</button>
+                <button type="button" class="danger-text" id="deleteServerPost">고민 삭제</button>
+              ` : `
+                <button type="button" id="reportServerPost">이 글 신고</button>
+                ${author?.user_id ? `<button type="button" id="blockPostAuthor">작성자 차단</button>` : ""}
+              `}
+            </div>
+          </details>
+          <button data-close="detail" class="soft">닫기</button>
         </div>
-        <button data-close="detail" class="soft">닫기</button>
       </div>
 
-      <small class="detail-meta">
-        ${escapeText(post.topic)} ·
-        ${post.visibility === "private"
-          ? "나만보기"
-          : escapeText(ways[way] || "")}
-      </small>
-
-      ${post.is_mine ? `
-        <div class="row">
-          <button type="button" class="soft" id="editServerPost">수정</button>
-          <button type="button" class="danger" id="deleteServerPost">삭제</button>
-        </div>
-      ` : ""}
-
-      ${!post.is_mine ? `
-        <button type="button" class="soft" id="reportServerPost">신고</button>
-      ` : ""}
-      ${!post.is_mine && author?.user_id ? `
-        <button type="button" class="soft" id="blockPostAuthor">작성자 차단</button>
-      ` : ""}
 
       ${post.is_mine && post.status === "hidden" ? `
         <div class="hidden-banner" role="status">
-          <span>신고가 쌓여 가려졌어요. 다른 이웃에게는 보이지 않아요.</span>
+          <span>신고가 쌓여 잠시 가려졌어요. 섬지기가 확인하는 동안 다른 이웃에게는 보이지 않아요.</span>
           <button type="button" class="soft" id="appealPost">이의 제기</button>
         </div>
       ` : ""}
 
-      <h2 class="detail-title">${escapeText(post.title)}</h2>
-      <p class="post-text">${escapeText(post.content)}</p>
-
-      <button
-        type="button"
-        class="soft"
-        id="reactionButton"
-        aria-pressed="${post.reacted_by_me}"
-      >
-        ${post.reacted_by_me ? "♥" : "♡"} 공감 ${post.reaction_count}
-      </button>
+      <!-- 큰 카드 하나 = 글 + 위로 (안쪽은 이어지게) / 둘러보기는 카드 밖에 따로 -->
+      <div class="talk-card">
+      <article class="post-main" aria-label="작성자의 고민">
+        <div class="row post-author">
+          <img class="detail-avatar ${toneClass(author?.color)}" src="${img(animal)}" alt="">
+          <strong>${escapeText(nickname)}${post.is_mine ? ` <span class="me-tag">나</span>` : ""}</strong>
+          <small>${escapeText([author?.job, post.years].filter(Boolean).join(" · "))}</small>
+          <span class="badge-row">${titleBadge(author?.title)}${personaChip(author?.character)}</span>
+        </div>
+        <h2 class="detail-title">${escapeText(post.title)}</h2>
+        <p class="post-text">${escapeText(post.content)}</p>
+        <div class="between post-foot">
+          <small class="detail-meta">
+            <span class="topic-chip">${escapeText(post.topic)}</span>
+            ${post.visibility === "private" ? "나만보기" : escapeText(ways[way] || "")}
+          </small>
+          <button
+            type="button"
+            class="soft reaction-btn"
+            id="reactionButton"
+            aria-pressed="${post.reacted_by_me}"
+          >
+            ${post.reacted_by_me ? "♥" : "♡"} 공감 ${post.reaction_count}
+          </button>
+        </div>
+      </article>
 
       ${post.is_mine && post.visibility === "private" ? `
-      <section class="private-chat" id="privateChat" aria-labelledby="privateChatTitle">
+      <section class="private-chat talk-replies" id="privateChat" aria-labelledby="privateChatTitle">
         <h3 id="privateChatTitle">온도와 둘만의 이야기</h3>
         <p class="private-note">나만보기 글이라 이 대화는 나만 볼 수 있어요. 글을 공개로 바꿔도 이웃에게 보이지 않아요.</p>
         <div class="chat-log" id="chatLog" aria-live="polite">대화를 불러오는 중...</div>
@@ -1300,35 +1623,36 @@ async function showPost(id, open = true) {
         </form>
         <small class="chat-remaining" id="chatRemaining"></small>
       </section>` : `
-      <section class="replies">
-        <h3>함께 건넨 위로 ${
+      <section class="replies talk-replies" aria-labelledby="repliesTitle">
+        <h3 class="section-title" id="repliesTitle">이웃들의 위로 <span class="count">${
           comments.filter(comment => !comment.is_deleted).length
-        }</h3>
+        }</span></h3>
 
         ${renderComments(comments, post)}
 
         ${showTyping ? `<p id="aiTyping" class="ai-typing" aria-live="polite">온도가 답글을 쓰고 있어요…</p>` : ""}
 
         ${post.visibility === "public" ? `
-          <form id="replyForm">
-            <label for="reply">따뜻한 위로를 남겨주세요.</label>
+          <form id="replyForm" class="composer">
+            <label for="reply" class="sr-only">위로 남기기</label>
             <p id="replyTarget" class="reply-target" hidden>
-              <span></span> · <button type="button" class="plain" id="cancelReply">취소</button>
+              <span></span><button type="button" class="plain" id="cancelReply" aria-label="답글 취소">✕</button>
             </p>
             <div class="row">
               <input
                 id="reply"
                 required
                 maxlength="400"
-                placeholder="답글을 적어주세요"
+                placeholder="따뜻한 위로를 남겨 주세요"
               >
-              <button>등록</button>
+              <button>남기기</button>
             </div>
           </form>
         ` : ""}
       </section>`}
+      </div>
 
-      <section id="similarPosts" class="similar-posts"></section>
+      <section id="similarPosts" class="similar-posts browse-zone" aria-label="둘러보기"></section>
     `;
 
     renderSimilar(post.id);
@@ -1505,7 +1829,8 @@ async function showPost(id, open = true) {
       const target = el("replyTarget");
       const active = replyTo?.postId === post.id;
       target.hidden = !active;
-      if (active) target.querySelector("span").textContent = `${replyTo.name}님에게 답글`;
+      if (active) target.querySelector("span").textContent = `↳ ${replyTo.name}님에게 답글`;
+      input.placeholder = active ? `${replyTo.name}님에게 답글을 남겨 주세요` : "따뜻한 위로를 남겨 주세요";
     };
     updateReplyTarget();
 
@@ -1561,7 +1886,7 @@ async function showPost(id, open = true) {
 
         await showPost(post.id, false);
         await renderFeed();
-        toast("답글을 남겼어요.");
+        toast(parentId ? "답글을 남겼어요." : "위로를 남겼어요.");
 
         showCrisisSupport(result.crisis_support);
 
@@ -1579,7 +1904,7 @@ async function showPost(id, open = true) {
         );
       } finally {
         button.disabled = false;
-        button.textContent = "등록";
+        button.textContent = "남기기";
       }
     };
 
@@ -1590,6 +1915,15 @@ async function showPost(id, open = true) {
     return null;
   }
 }
+
+// "⋯" 메뉴: 메뉴 밖을 누르거나 메뉴 안 버튼을 누르면 닫힘
+document.addEventListener("click", (event) => {
+  document.querySelectorAll(".more-menu[open]").forEach((menu) => {
+    if (!menu.contains(event.target) || event.target.closest(".more-list button")) {
+      menu.open = false;
+    }
+  });
+});
 
 // 상세 창을 닫으면 AI 답글 대기도 멈춤
 el("detail").addEventListener("close", () => {
@@ -1668,9 +2002,9 @@ function notificationText(n) {
     case "thanks":
       return { text: "글쓴이가 내 댓글에 고마워했어요", name: null };
     case "hidden":
-      return { text: "신고가 쌓여 내 글이나 댓글이 가려졌어요", name: null };
+      return { text: "신고가 쌓여 내 글이나 댓글을 잠시 가렸어요. 이의가 있으면 글에서 알려 주세요", name: "섬지기" };
     case "restored":
-      return { text: "검토 결과 문제가 없어 다시 보이게 했어요", name: null };
+      return { text: "살펴보니 문제가 없어서 다시 보이게 했어요", name: "섬지기" };
     default:
       return { text: "새 알림", name: null };
   }
@@ -1850,6 +2184,15 @@ async function loadMyComments() {
   }
 }
 
+// 내 프로필 패널이 화면 아래로 넘치지 않게: 실제 위치(top)에서 화면 끝까지만 높이를 주고 나머지는 패널 안 스크롤
+function fitPersonal() {
+  const section = el("personal");
+  if (!section || section.hidden) return;
+  const top = section.getBoundingClientRect().top;
+  section.style.maxHeight = Math.max(220, window.innerHeight - top - 12) + "px";
+}
+window.addEventListener("resize", fitPersonal);
+
 function personal(detail = null) {
   const section = el("personal");
   const unread = serverUnreadCount;
@@ -1858,6 +2201,7 @@ function personal(detail = null) {
     ["private", "나만보기"],
     ["own", "내 고민"],
     ["comments", "내 댓글"],
+    ["titles", "칭호 도감"],
     ["settings", "캐릭터 설정"],
   ];
   const heading = detail
@@ -1867,6 +2211,7 @@ function personal(detail = null) {
       : tabs.find(([id]) => id === tab)[1];
   section.hidden = false;
   el("profile").setAttribute("aria-expanded", "true");
+  requestAnimationFrame(fitPersonal);
   let content;
   if (detail) {
     content = `<article><strong>${escapeText(detail.title)}</strong><small>${escapeText(detail.name)}</small><p>${escapeText(detail.body)}</p></article><div class="row"><button data-tab="alerts" class="soft">← 알림 목록</button></div>`;
@@ -1874,10 +2219,12 @@ function personal(detail = null) {
     content = '<div id="serverAlerts">알림을 불러오는 중...</div>';
   } else if (tab === "comments") {
   content = '<div id="myServerComments">내 댓글을 불러오는 중...</div>';
-  }else if (tab === "settings") {
+  } else if (tab === "titles") {
+    content = '<div id="titleBook" class="title-book">칭호를 불러오는 중...</div>';
+  } else if (tab === "settings") {
     content = `<form id="profileSettings" class="profile-settings">
       <label for="profileNick">닉네임</label><input id="profileNick" maxlength="18" required value="${escapeText(me.nick)}">
-      <p class="my-persona">내 칭호 ${personaBadge(CHARACTER_KEYS[me.animal])}</p>
+      <p class="my-persona">내 성격 ${personaChip(CHARACTER_KEYS[me.animal])} <small>활동 칭호는 "칭호 도감"에서 볼 수 있어요</small></p>
       <strong>캐릭터</strong><div class="profile-character-grid">${characterNames.map((name, index) => `<button type="button" data-profile-animal="${index}" aria-label="${name} · ${personaOf(CHARACTER_KEYS[index])?.label || ""}" title="${personaOf(CHARACTER_KEYS[index])?.label || ""}" aria-pressed="${index === me.animal}"><img class="${toneClass(me.color)}" src="${img(index)}" alt=""><span>${personaOf(CHARACTER_KEYS[index])?.icon || ""} ${name}</span></button>`).join("")}</div>
       <button class="wide">변경사항 저장</button></form>`;
   } else {
@@ -1887,6 +2234,7 @@ function personal(detail = null) {
     ${detail ? "" : '<p id="mySummary" class="my-summary">활동 요약을 불러오는 중...</p>'}
     ${detail ? "" : '<div class="row personal-tabs">' + tabs.map(([id, label]) => `<button data-tab="${id}" ${id === tab ? "" : 'class="soft"'} aria-pressed="${id === tab}">${label}</button>`).join("") + "</div>"}${content}`;
   if (!detail) loadMySummary();
+  if (!detail && tab === "titles") loadTitleBook();
   if (!detail && tab === "settings") setupProfileSettings(section);
   if (!detail && (tab === "own" || tab === "private")) {
     loadMyPosts(tab);
@@ -1924,9 +2272,66 @@ async function loadMySummary() {
   try {
     const s = await api("/users/me/summary");
     if (el("mySummary") !== box) return;
-    box.textContent = `내가 도운 고민 ${s.posts_helped}개 · 받은 고마워요 ${s.thanks_received}개 · 쓴 글 ${s.post_count} · 쓴 댓글 ${s.comment_count}`;
+    box.textContent = `쓴 글 ${s.post_count}개 · 쓴 댓글 ${s.comment_count}개 · 위로한 고민 ${s.posts_helped}개 · 받은 고마움 ${s.thanks_received}번`;
   } catch (error) {
     if (el("mySummary") === box) box.textContent = "활동 요약을 불러오지 못했어요.";
+  }
+}
+
+// 칭호 도감: 얻은 칭호는 색으로, 아직 못 얻은 칭호는 진행도와 함께. 얻은 칭호를 누르면 대표 칭호로
+const TIER_LABELS = { 1: "새싹", 2: "따뜻한", 3: "빛나는", 4: "전설" };
+async function loadTitleBook(data = null) {
+  const box = el("titleBook");
+  if (!box) return;
+  try {
+    const book = data || (await api("/users/me/titles"));
+    if (el("titleBook") !== box) return;
+    const tiers = [1, 2, 3, 4].map((tier) => {
+      const items = book.items.filter((t) => t.tier === tier);
+      return `
+        <section class="title-tier">
+          <h4>${TIER_LABELS[tier]} 칭호</h4>
+          <div class="title-grid">
+            ${items.map((t) => `
+              <button type="button" class="title-card tier-${t.tier} ${t.earned ? "earned" : "locked"}"
+                data-title-key="${escapeText(t.key)}" ${t.earned ? "" : "disabled"}
+                aria-pressed="${book.current?.key === t.key}"
+                aria-label="${escapeText(t.name)}${t.earned ? " (얻음, 누르면 대표 칭호로)" : ` (${t.progress}/${t.need})`}">
+                <span class="title-icon">${t.earned ? escapeText(t.icon) : "🔒"}</span>
+                <strong>${escapeText(t.name)}</strong>
+                <small>${escapeText(t.desc)}</small>
+                ${t.earned
+                  ? (book.current?.key === t.key ? '<em class="title-current">대표 칭호</em>' : "")
+                  : `<span class="title-progress" aria-hidden="true"><i style="width:${Math.round((t.progress / t.need) * 100)}%"></i></span>
+                     <small class="title-count">${escapeText(t.stat_label)} ${t.progress}/${t.need}</small>`}
+              </button>`).join("")}
+          </div>
+        </section>`;
+    }).join("");
+    box.innerHTML = `
+      <div class="title-now">
+        <span>지금 대표 칭호</span>
+        ${book.current ? titleBadge(book.current) : '<small>아직 칭호가 없어요. 고민을 나누거나 위로를 건네 보세요.</small>'}
+        <small>${book.earned_count}/${book.items.length}개 얻음${book.chosen_key ? "" : " · 자동으로 가장 높은 칭호를 보여 줘요"}</small>
+        ${book.chosen_key ? '<button type="button" class="link-btn" id="titleAuto">자동으로 되돌리기</button>' : ""}
+      </div>
+      ${tiers}`;
+    const choose = async (key) => {
+      try {
+        const next = await api("/users/me/title", { method: "PATCH", body: { key } });
+        loadTitleBook(next);
+        loadNeighbors();
+        toast(key ? "대표 칭호를 바꿨어요" : "가장 높은 칭호를 자동으로 보여 줄게요");
+      } catch (error) {
+        toast(error.message);
+      }
+    };
+    box.querySelectorAll(".title-card.earned").forEach((card) => {
+      card.onclick = () => choose(card.dataset.titleKey);
+    });
+    el("titleAuto")?.addEventListener("click", () => choose(null));
+  } catch (error) {
+    if (el("titleBook") === box) box.textContent = "칭호를 불러오지 못했어요.";
   }
 }
 
@@ -1971,7 +2376,7 @@ function setupColorPalette(form) {
   const wrap = document.createElement("div");
   wrap.className = "color-palette";
   wrap.innerHTML = `
-    <button type="button" class="soft" id="paletteToggle" aria-expanded="false" aria-controls="paletteOptions">🎨 색감 고르기</button>
+    <button type="button" class="soft" id="paletteToggle" aria-expanded="false" aria-controls="paletteOptions">색감 고르기</button>
     <div id="paletteOptions" class="palette-options" role="group" aria-label="캐릭터 색감" hidden>
       ${CHARACTER_COLORS.map(([key, label]) => `
         <button type="button" data-color="${key}" aria-pressed="${key === current()}">
@@ -2182,6 +2587,7 @@ function showFeed(open) {
   el("feedPanel").hidden = !open;
   el("feedToggle").setAttribute("aria-expanded", open);
 }
+let bodyPlaceholder = null;
 function editor(p = null) {
   editing = p?.id ?? null;
   el("postForm").reset();
@@ -2190,6 +2596,8 @@ function editor(p = null) {
     : "어떤 고민을 나누고 싶나요?";
   el("postTitle").value = p?.title || "";
   el("body").value = p?.body || "";
+  if (bodyPlaceholder === null) bodyPlaceholder = el("body").placeholder;
+  el("body").placeholder = bodyPlaceholder; // 섬지기 질문으로 바꿨던 안내를 되돌림
   el("postTitle").setCustomValidity("");
   el("body").setCustomValidity("");
   el("privatePost").checked = Boolean(p?.private);
@@ -2224,7 +2632,7 @@ if (me && authToken()) {
   // 글쓰기 창: 고민이 지도 어디에 놓이는지 안내
   const placeHint = document.createElement("p");
   placeHint.className = "place-hint";
-  placeHint.textContent = "📍 지금 내 캐릭터가 서 있는 자리에 고민이 놓여요.";
+  placeHint.textContent = "지금 내 캐릭터가 서 있는 자리에 고민이 놓여요.";
   [...el("postForm").querySelectorAll("button:not([type=button])")].pop()?.before(placeHint);
   el("profile").onclick = () =>
     el("personal").hidden ? personal() : closeProfile();
@@ -2456,6 +2864,8 @@ if (me && authToken()) {
             ? reviewError
             : blocked
               ? "서버 점검에서 수정이 필요한 표현이 발견됐어요."
+              : serverReview?.ok && serverReview.hint
+                ? "게시할 수 있어요. 조금만 더 적어 주면 이웃이 위로하기 쉬워요."
               : serverReview?.ok
                 ? "서버 점검을 통과했어요. 게시할 수 있어요."
                 : "게시 전 점검을 준비하고 있어요.";
@@ -2530,9 +2940,22 @@ if (me && authToken()) {
         <small class="check-excerpt">${escapeText(issue.text || "문제 구절 위치를 찾지 못했어요")}</small>
         ${issue.guide ? `<p>${escapeText(issue.guide)}</p>` : ""}
       </div>`).join("");
-      el("reviewResults").innerHTML = blocked
+      // 내용이 부실해 보이면 막지 않고 '조금 더 적어 볼래요?'만 권한다 (기준은 BE app/draft_hint.py)
+      const hint = serverReview.hint;
+      const hintBox = hint && !blocked ? `<div class="draft-hint" role="note">
+        <strong>조금만 더 적어 볼래요?</strong>
+        <p>${escapeText(hint.message)}</p>
+        <ul>${(hint.tips || []).map((tip) => `<li>${escapeText(tip)}</li>`).join("")}</ul>
+        <div class="row"><button type="button" class="soft" data-hint-write>본문 더 적기</button><small>그대로 올려도 괜찮아요.</small></div>
+      </div>` : "";
+      el("reviewResults").innerHTML = hintBox + (blocked
         ? `<div class="review-result check-row pending"><p>${escapeText(serverReview.reason || "수정이 필요한 표현이 있어요.")}</p><p>${escapeText(serverReview.suggestion || "")}</p></div>${issueRows}`
-        : `<div class="review-result check-row"><strong><span class="check-icon" aria-hidden="true">✓</span>서버 점검 통과</strong></div>${issueRows}`;
+        : `<div class="review-result check-row"><strong><span class="check-icon" aria-hidden="true">✓</span>서버 점검 통과</strong></div>${issueRows}`);
+      el("reviewResults").querySelector("[data-hint-write]")?.addEventListener("click", () => {
+        const body = el("reviewDraftBody");
+        body.focus();
+        body.setSelectionRange(body.value.length, body.value.length);
+      });
       showSecurityGuard(issues);
     } else {
       el("reviewResults").innerHTML = `<p class="review-note">${pendingDraft.private ? "나만보기 글은 검사하지 않아요." : "점검 결과가 없어요."}</p>`;
@@ -2705,6 +3128,7 @@ if (me && authToken()) {
     } = button.dataset;
     if (button.hasAttribute("data-campfire")) showCampfireInfo();
     if (button.hasAttribute("data-bottle")) openBottle();
+    if (button.hasAttribute("data-keeper")) openKeeper();
     if (button.dataset.themeAuto !== undefined) {
       state.themeMode = "auto";
       save();
@@ -2773,6 +3197,21 @@ if (me && authToken()) {
     world.style.setProperty("--dy", dy + "px");
     world.style.setProperty("--scale", zoom);
   }
+  // 내 캐릭터가 화면 가장자리 여백 안쪽에 머물도록 지도를 끌어옴.
+  // 지도 끝에 닿으면 positionMap이 더 못 가게 막으므로, 그때는 캐릭터만 지도 끝(4~96%)까지 간다.
+  followPlayer = () => {
+    const box = world.getBoundingClientRect();
+    const view = map.getBoundingClientRect();
+    const px = box.left + (box.width * state.player.x) / 100;
+    const py = box.top + (box.height * state.player.y) / 100;
+    const marginX = Math.min(110, view.width * 0.18);
+    const marginY = Math.min(110, view.height * 0.18);
+    if (px < view.left + marginX) dx += view.left + marginX - px;
+    else if (px > view.right - marginX) dx -= px - (view.right - marginX);
+    if (py < view.top + marginY) dy += view.top + marginY - py;
+    else if (py > view.bottom - marginY) dy -= py - (view.bottom - marginY);
+    positionMap();
+  };
   let guideTimer;
   function showZoomGuide() {
     const now = new Date();
@@ -2806,7 +3245,7 @@ if (me && authToken()) {
     const box = map.getBoundingClientRect();
     const stageX = box.left + box.width / 2;
     const stageY = box.top + box.height / 2;
-    const next = Math.max(1, Math.min(3.5, value));
+    const next = Math.max(1, Math.min(MAX_ZOOM, value));
     if (next !== zoom) showZoomGuide();
     const ratio = next / zoom;
     const ax = (x ?? stageX) - stageX;
@@ -2950,6 +3389,7 @@ if (me && authToken()) {
   loadNeighbors();
   loadFootprints();
   loadBottle();
+  loadKeeper();
   setInterval(loadFootprints, 60 * 1000); // 새로 다녀간 이웃 반영
 }
 
