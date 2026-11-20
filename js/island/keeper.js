@@ -102,7 +102,6 @@ async function openKeeper() {
         ${keeperSvg(72)}
         <div>
           <h2 id="keeperTitle">${escapeText(k.name)} <small class="keeper-role">섬 운영</small></h2>
-          ${k.moment ? `<small class="keeper-moment">${escapeText(k.moment)}의 한마디</small>` : ""}
           <p class="keeper-say">${escapeText(k.greeting)}</p>
         </div>
       </div>
@@ -124,8 +123,6 @@ async function openKeeper() {
         <div class="keeper-stats">
           ${stat(w.posts, "나눈 고민")}
           ${stat(w.comforts, "이웃의 위로")}
-          ${stat(w.ai_comforts, "온도의 위로")}
-          ${stat(w.visitors, "다녀간 이웃")}
         </div>
         ${w.top_topic ? `<p class="keeper-note">이번 주에 가장 많이 나눈 고민은 <b>${escapeText(w.top_topic)}</b>${copula(w.top_topic)}.</p>` : ""}
       </section>
@@ -144,7 +141,6 @@ async function openKeeper() {
       </details>
       </div>
 
-      <p class="keeper-foot">섬지기는 댓글을 달지 않아요. 위로는 온도와 이웃들이, 규칙과 안전은 섬지기가 맡아요.</p>
       <button value="close" class="soft wide">닫기</button>
     </form>`;
   dialog.querySelector("#keeperWrite").onclick = () => {
