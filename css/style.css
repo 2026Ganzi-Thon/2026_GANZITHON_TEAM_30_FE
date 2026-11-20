@@ -313,7 +313,8 @@ nav {
   border-radius: 10px;
   opacity: 0.65;
 }
-.character-card[aria-pressed="true"] {
+.character-card[aria-pressed="true"],
+.character-card.is-current {
   opacity: 1;
   background: #f1f8fc;
   box-shadow: 0 2px 12px #31594126;
@@ -459,21 +460,51 @@ main:has(#home:not([hidden])) {
   left: var(--x);
   top: var(--y);
   transform: translate(-50%, -50%);
-  width: 8.6%;
-  display: grid;
-  justify-items: center;
+  width: auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
   pointer-events: none;
+  z-index: 2;
 }
-#home .welcome-marker img {
+.welcome-bubble {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 11px;
+  border-radius: 999px;
+  background: #ffffff;
+  color: #253f35;
+  font-size: clamp(9px, 0.78vw, 11px);
+  font-weight: 700;
+  line-height: 1.25;
+  white-space: nowrap;
+  box-shadow: 0 3px 10px rgba(24, 54, 43, 0.16);
+}
+/* 말풍선 앞 작은 점(●) */
+.welcome-bubble::before {
+  content: "";
+  flex: none;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #3d5249;
+}
+.welcome-bubble.is-short {
+  max-width: clamp(92px, 9.5vw, 125px);
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+#home .welcome-marker .welcome-char {
+  width: clamp(28px, 3.6vw, 46px);
+  height: auto;
   min-height: 0;
-  width: 100%;
+  margin-top: 0;
   border-radius: 0;
   object-fit: contain;
-}
-#home .welcome-marker img + img {
-  width: 52%;
-  margin-top: -19%;
-  position: relative;
+  filter: drop-shadow(0 3px 4px rgba(24, 54, 43, 0.22));
 }
 #home .map button,
 .welcome-banner {
@@ -669,13 +700,14 @@ main:has(#home:not([hidden])) {
 nav {
   position: relative;
 }
-.site-brand {
-  position: absolute;
-  left: 50%;
-  transform: translateX(-50%);
-  font-size: clamp(22px, 2.2vw, 30px);
-  font-weight: 900;
-  letter-spacing: 0.08em;
+body:has(#home:not([hidden])) .site-brand {
+  position: static;
+  left: auto;
+  transform: none;
+  font-size: clamp(18px, 1.5vw, 22px);
+  font-weight: 800;
+  letter-spacing: 0.03em;
+  color: #3d6656;
 }
 #account {
   margin-left: auto;
@@ -758,4 +790,348 @@ nav {
   background: #e5f4ea;
   color: #24594f;
   font-weight: 700;
+}
+
+/* ───────── 11/19 기획 피드백: 시작 화면 ───────── */
+@font-face {
+  font-family: "Hakgyoansim Dunggeunmiso";
+  src: url("../assets/fonts/HakgyoansimDunggeunmiso-B.woff2") format("woff2");
+  font-weight: 700;
+  font-display: swap;
+}
+/* WELCOME 버튼은 지도(길) 위에 겹치지 않게 지도 아래로. 로그인 창 위 배너와 같은 크기·글꼴(둥근미소 44px) */
+#home .map {
+  display: grid;
+  justify-items: center;
+  gap: clamp(18px, 2.4vw, 30px);
+  margin-bottom: 24px;
+}
+#home .map button,
+.welcome-banner {
+  font-family: "Hakgyoansim Dunggeunmiso", "Malgun Gothic", sans-serif;
+  font-size: clamp(22px, 3.1vw, 44px);
+  font-weight: 700;
+  line-height: 1.15;
+  letter-spacing: 0;
+  width: min(500px, 86%);
+  padding: clamp(10px, 1.1vw, 16px) 18px;
+  white-space: nowrap;
+}
+#home .map button {
+  position: static;
+  transform: none;
+  cursor: pointer;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+#home .map button:hover,
+#home .map button:focus-visible {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px rgba(36, 60, 52, 0.25);
+}
+.welcome-banner {
+  width: min(500px, 86%);
+  font-size: clamp(20px, 3.1vw, 44px);
+}
+/* 로그인 창은 아래에서 자연스럽게 떠오르게 (피그마 프로토타입) */
+#info[open] {
+  animation: info-rise 0.5s cubic-bezier(0.22, 1, 0.36, 1);
+}
+#info[open]::backdrop {
+  animation: info-fade 0.5s ease;
+}
+@keyframes info-rise {
+  from {
+    opacity: 0;
+    transform: translateY(70px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes info-fade {
+  from {
+    opacity: 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  #info[open],
+  #info[open]::backdrop {
+    animation: none;
+  }
+}
+
+/* ───────── 가입 화면 색감 팔레트 (BE CHARACTER_COLORS 키와 같음) ───────── */
+.tone-warm { filter: grayscale(1) sepia(1) hue-rotate(-50deg) saturate(3.2) brightness(0.95); }
+.tone-forest { filter: grayscale(1) sepia(1) hue-rotate(58deg) saturate(1.9) brightness(0.98); }
+.tone-ocean { filter: grayscale(1) sepia(1) hue-rotate(160deg) saturate(2.4) brightness(1.02); }
+.tone-lavender { filter: grayscale(1) sepia(1) hue-rotate(222deg) saturate(2.8) brightness(0.96); }
+.tone-pastel { filter: saturate(0.55) brightness(1.12); }
+.tone-vivid { filter: saturate(1.9) contrast(1.05); }
+.tone-mono { filter: grayscale(1); }
+.character-image { transition: filter 0.25s ease; }
+
+.stage .color-palette {
+  display: grid;
+  justify-items: center;
+  gap: 10px;
+  margin-top: 6px;
+}
+.palette-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 36px;
+  padding: 6px 16px;
+  border: 1px solid #d9dfcf;
+  border-radius: 999px;
+  background: #fffdf7;
+  color: #2c4436;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.palette-toggle[aria-expanded="true"] {
+  background: #2f5d47;
+  border-color: #2f5d47;
+  color: #fff;
+}
+.palette-icon {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: conic-gradient(#e8633a, #f0b35a, #7fb38a, #5d9bd1, #b78cf0, #e8633a);
+}
+.palette-options {
+  display: grid;
+  grid-template-columns: repeat(4, 76px);
+  gap: 8px;
+  padding: 10px;
+  border-radius: 16px;
+  background: rgba(255, 253, 247, 0.92);
+  box-shadow: 0 6px 18px rgba(36, 60, 52, 0.12);
+}
+.palette-options[hidden] { display: none; }
+.palette-options button {
+  display: grid;
+  justify-items: center;
+  gap: 2px;
+  padding: 6px 4px;
+  border: 2px solid transparent;
+  border-radius: 12px;
+  background: none;
+  color: #2c4436;
+  font-size: 12px;
+  cursor: pointer;
+}
+.palette-options button[aria-pressed="true"] {
+  border-color: #2f5d47;
+  background: #eef4ea;
+  font-weight: 700;
+}
+.palette-options img {
+  width: 44px;
+  height: 44px;
+  object-fit: contain;
+}
+.wheel-hint {
+  margin: 4px 0 0;
+  font-size: 12px;
+  color: #6c7a70;
+}
+@media (max-width: 690px) {
+  .palette-options { grid-template-columns: repeat(4, 64px); gap: 4px; }
+  .palette-options img { width: 36px; height: 36px; }
+  .wheel-hint { display: none; }
+}
+
+/* 섬에서 캐릭터 수정하러 왔을 때: 저장 안 하고 돌아가기 */
+#choose .edit-cancel {
+  justify-self: start;
+  align-self: start;
+  margin-bottom: 8px;
+  padding: 6px 4px;
+  border: 0;
+  background: none;
+  color: #4d6357;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+#choose .edit-cancel:hover {
+  text-decoration: underline;
+}
+#choose .edit-cancel[hidden] {
+  display: none;
+}
+
+/* 캐릭터 카드 위 팔레트 (직무 아이콘 자리). 가운데 카드는 팔레트 아래 '색감 고르기' */
+.character-card .palette-badge {
+  display: grid;
+  justify-items: center;
+  align-content: start;
+  gap: 2px;
+  height: 23%;
+  width: 40%;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: #2f5d47;
+  z-index: 2;
+}
+.character-card .palette-badge img {
+  display: block;
+  width: auto;
+  height: clamp(22px, 3.6vw, 44px);
+  object-fit: contain;
+  filter: drop-shadow(0 2px 2px rgba(0, 0, 0, 0.12));
+}
+.character-card button.palette-badge {
+  cursor: pointer;
+  border-radius: 10px;
+}
+.character-card button.palette-badge span {
+  font-size: clamp(11px, 1.1vw, 13px);
+  font-weight: 700;
+  white-space: nowrap;
+}
+.character-card button.palette-badge:hover img,
+.character-card button.palette-badge[aria-expanded="true"] img {
+  transform: translateY(-2px) rotate(-6deg);
+}
+.character-card button.palette-badge img {
+  transition: transform 0.2s ease;
+}
+.character-card button.palette-badge:focus-visible {
+  outline: 3px solid #0084a7;
+  outline-offset: 2px;
+}
+.character-card.is-current {
+  cursor: default;
+}
+
+/* ───────── 11/20: WELCOME 글꼴(피그마), 이메일 창 닫기 버튼이 배너와 안 겹치게 ───────── */
+/* Raleway SemiBold를 이 버튼에 쓰는 글자만 남겨 OndoWelcome으로 이름 바꿔 넣음 (OFL, assets/fonts/LICENSE.md) */
+@font-face {
+  font-family: "OndoWelcome";
+  src: url("../assets/fonts/OndoWelcome-SemiBold.woff2") format("woff2");
+  font-weight: 600;
+  font-display: swap;
+}
+#home .map button,
+.welcome-banner {
+  font-family: "OndoWelcome", "Pretendard", "Malgun Gothic", sans-serif;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+}
+/* 배너가 창 윗변에 반쯤 걸쳐 있어서, 닫기 버튼과 제목을 배너 아래로 내림 */
+.info-card {
+  padding-top: clamp(58px, 5.6vw, 80px);
+}
+.info-card .close {
+  top: clamp(40px, 4.2vw, 54px);
+}
+#home .map {
+  position: relative;
+  display: block;
+  margin: clamp(22px, 2.6vw, 34px) 0 54px;
+}
+#home .map button {
+  position: absolute;
+  left: 50%;
+  bottom: 0;
+  transform: translate(-50%, 50%);
+  width: min(39%, 320px);
+  min-width: 210px;
+  padding: clamp(11px, 1.1vw, 15px) 24px;
+  border-radius: 999px;
+  background: #243c34;
+  color: #fbfaf5;
+  font-family: "Malgun Gothic", "Apple SD Gothic Neo", sans-serif;
+  font-size: clamp(13px, 1.15vw, 16px);
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  line-height: 1.2;
+  white-space: nowrap;
+  box-shadow: 0 6px 16px rgba(36, 60, 52, 0.22);
+  cursor: pointer;
+  z-index: 3;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+#home .map button:hover,
+#home .map button:focus-visible {
+  transform: translate(-50%, calc(50% - 2px));
+  box-shadow: 0 10px 22px rgba(36, 60, 52, 0.28);
+}
+@media (max-width: 680px) {
+  #home .map button {
+    width: 62%;
+    min-width: 190px;
+  }
+  .welcome-bubble {
+    font-size: 9px;
+    padding: 4px 8px;
+  }
+}
+#info {
+  width: min(610px, calc(100% - 26px));
+  padding: 36px 0 0;
+  border-radius: 0;
+  background: transparent;
+  overscroll-behavior: contain;
+}
+#info::backdrop {
+  background: rgba(48, 54, 48, 0.45);
+}
+.info-card {
+  position: relative;
+  background: #ffffff;
+  border-radius: 21px;
+  padding: clamp(52px, 4.8vw, 66px) clamp(20px, 2.2vw, 32px) clamp(24px, 3.1vw, 44px);
+}
+.welcome-banner {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: min(56%, 340px);
+  min-width: 230px;
+  min-height: 54px;
+  padding: 14px 28px;
+  border-radius: 999px;
+  background: #243c34;
+  color: #fbfaf5;
+  font-family: "Malgun Gothic", "Apple SD Gothic Neo", sans-serif;
+  font-size: clamp(14px, 1.3vw, 17px);
+  font-weight: 600;
+  line-height: 1.2;
+  letter-spacing: 0.03em;
+  text-align: center;
+  white-space: nowrap;
+  box-shadow: 0 3px 10px rgba(24, 48, 40, 0.14);
+}
+.info-card .close {
+  position: absolute;
+  top: 16px;
+  right: clamp(15px, 1.8vw, 24px);
+  z-index: 3;
+}
+@media (max-width: 680px) {
+  #info {
+    padding-top: 30px;
+  }
+  .info-card {
+    padding-top: 46px;
+  }
+  .welcome-banner {
+    width: min(68%, 270px);
+    min-width: 190px;
+    min-height: 46px;
+    padding: 11px 18px;
+    font-size: 14px;
+  }
 }

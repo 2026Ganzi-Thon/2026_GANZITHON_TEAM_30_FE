@@ -166,8 +166,9 @@ const repliesFor = (p) => [
 const find = (id) => [...own(), ...samples].find((p) => p.id === id);
 const opt = (text, value = text) => new Option(text, value);
 let comfortFilter = "";
+let categoryFilter = ""; // 고민 주제(대분류) 필터
 let waitingOnly = false; // "답을 기다리는 고민"만 보기
-const activeFilters = () => searchText || comfortFilter || waitingOnly;
+const activeFilters = () => searchText || comfortFilter || categoryFilter || waitingOnly;
 const tokenise = (text) => text.toLowerCase().match(/[\p{L}\p{N}]{2,}/gu) || [];
 let selectedTopic = "";
 let zoom = 1,

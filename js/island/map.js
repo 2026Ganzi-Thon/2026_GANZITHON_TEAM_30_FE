@@ -1,4 +1,4 @@
-// 지도: 이웃 배치 · 마커 · 이름표/칭호 배지 · 처음 안내
+// 지도: 이웃 배치 · 마커 · 이름표/칭호 배지 · 검색 필터 · 처음 안내
 // (island-core.js에서 분리. 모든 island/*.js는 전역 스코프를 공유하는 일반 스크립트라 HTML의 로드 순서가 중요합니다)
 
 // ───────── 지도: 이웃 배치 · 실시간 접속 · 공명 · 모닥불 · 방향키 ─────────
@@ -6,6 +6,8 @@ const clusterPoint = { x: 31, y: 57 };
 const MAX_ZOOM = 2; // 지도 확대는 100~200%: 더 키우면 캐릭터·말풍선이 깨지고 길을 잃기 쉬움
 const revealZoom = 0; // 이웃을 숫자로 묶지 않고 항상 각자 자리에 보여 줌
 const campfirePoint = { x: 50, y: 44 }; // 섬 중앙 광장
+// 섬 온도별 모닥불 그림 (피그마): 차가움·보통은 작은 불, 따뜻함은 중간 불, 뜨거움은 큰 불 + 불씨
+const campfireSize = { cold: "s", mild: "s", warm: "m", hot: "l" };
 // 강·호수·집을 피한 풀밭 자리(%). 글 위치가 없는 이웃은 이 중 한 곳에 선다
 const SPOTS = [
   [12, 27], [25, 25], [36, 20], [40, 29], [55, 25], [63, 29], [45, 8], [55, 10],
@@ -20,8 +22,12 @@ const islandId = Number(
 let serverNeighbors = [];
 let onlineNeighbors = new Map(); // user_id → { author, x, y } 지금 접속 중인 이웃
 let resonance = new Map(); // user_id → similarity 내 고민과 공명하는 이웃
+let resonancePosts = new Map(); // user_id → 그 이웃의 고민 중 내 고민과 가장 닮은 글 id ('🔥 공명'을 누르면 엶)
 let presenceEnabled = true;
 let islandTemp = null;
+// 검색(내 고민과 닮은 이야기 찾기) 중이면: user_id → 그 이웃의 닮은 고민. 지도에는 이 이웃들만 보여 줌 (null = 모두)
+let searchMatch = null;
+let searchMatchQuery = "";
 
 const shortTitle = (title, max = 14) =>
   title.length > max ? title.slice(0, max) + "…" : title;
@@ -51,6 +57,7 @@ async function loadNeighbors() {
     const firstLoad = !serverNeighbors.length;
     serverNeighbors = await api(`/islands/${islandId}/neighbors`);
     updateIslandCounts();
+    renderSearchNote();
     renderMarkers();
     if (firstLoad) followPlayer(); // 처음 들어오면 내 캐릭터가 보이는 곳에서 시작 (좁은 휴대폰 화면)
     loadResonance();
@@ -63,13 +70,11 @@ function updateIslandCounts() {
   const online = onlineNeighbors.size;
   document.querySelectorAll(".island-counts").forEach(element => {
     // 항목마다 span으로 나눠, 좁은 화면에서는 항목 단위로 줄을 바꾼다 (말줄임으로 잘리지 않게)
-    const items = [
-      `지도에 표시된 이웃 ${Number(serverNeighbors.length)}명`,
-      online ? `지금 접속 ${Number(online) + 1}명` : "",
-      footprintVisitors ? `오늘 다녀간 이웃 ${Number(footprintVisitors)}명` : "",
-    ].filter(Boolean);
+    const items = [`총 이웃 ${Number(serverNeighbors.length)}명`];
     element.innerHTML = items.map(text => `<span>${escapeText(text)}</span>`).join("");
-    element.title = "공개 글을 작성한 이웃과 지금 섬을 돌아다니는 이웃";
+    element.title = online
+      ? `공개 글을 작성한 이웃 · 지금 접속 ${Number(online) + 1}명`
+      : "공개 글을 작성한 이웃";
   });
 }
 
@@ -80,9 +85,20 @@ const personaChip = (character) => {
   return key ? `<span class="persona-badge persona-${key}">${escapeText(PERSONAS[key].label)}</span>` : "";
 };
 
+// 칭호 아이콘 그림(assets/titles/키.png). 그림이 없는 칭호(섬의 등불·섬의 등대)는 서버가 준 이모지를 씀
+const TITLE_ICON_KEYS = new Set([
+  "first_post", "sprout", "traveler", "kind", "heart_rich", "honest",
+  "storyteller", "first_comfort", "guide", "campfire", "shining",
+]);
+const titleIcon = (title, cls = "title-badge-icon") =>
+  TITLE_ICON_KEYS.has(title?.key)
+    ? `<img class="${cls}" src="assets/titles/${title.key}.png" alt="" aria-hidden="true">`
+    : `<span class="${cls} is-emoji" aria-hidden="true">${escapeText(title?.icon || "")}</span>`;
+
+// compact(지도 이름표): 아이콘만. 그 외(글 목록·댓글·글 상세·칭호 도감): 아이콘 + 칭호 이름 글자
 const titleBadge = (title, { compact = false } = {}) =>
   title
-    ? `<span class="title-badge tier-${Number(title.tier)}" title="${escapeText(title.tier_name)} 칭호 · ${escapeText(title.desc)}">${compact ? escapeText(title.icon) : escapeText(title.name)}</span>`
+    ? `<span class="title-badge tier-${Number(title.tier)}${compact ? " compact" : ""}" title="${escapeText(title.name)} · ${escapeText(title.tier_name)} 칭호 · ${escapeText(title.desc)}">${titleIcon(title)}${compact ? `<span class="sr-only">${escapeText(title.name)}</span>` : `<span class="title-badge-name">${escapeText(title.name)}</span>`}</span>`
     : "";
 
 // 실시간 접속 정보에는 칭호가 없으니, 이웃 목록에서 같은 사람의 칭호를 찾아 씀
@@ -102,10 +118,44 @@ const characterImg = (author, alt = "") => `
   <img class="${toneClass(author.color)}"
     src="${img(CHARACTER_KEYS.indexOf(author.character))}" alt="${alt}">`;
 
+// 검색 결과 → 지도 필터. 같은 이웃의 글이 여러 개면 가장 닮은(앞쪽) 글 하나를 말풍선으로
+function setSearchMatch(posts, query = "") {
+  const next = posts
+    ? new Map(posts.filter(p => p.author?.user_id && p.author.user_id !== me.id).reverse()
+        .map(p => [p.author.user_id, p]))
+    : null;
+  searchMatch = next;
+  searchMatchQuery = next ? query : "";
+  renderSearchNote();
+  renderMarkers();
+}
+
+// 지도 위 안내: "'퇴사'와 닮은 고민을 쓴 이웃 N명만 보여요 · 모두 보기"
+function renderSearchNote() {
+  let note = el("searchMapNote");
+  if (!searchMatch) {
+    note?.remove();
+    return;
+  }
+  if (!note) {
+    note = document.createElement("div");
+    note.id = "searchMapNote";
+    note.className = "search-map-note";
+    note.setAttribute("role", "status");
+    el("map").append(note);
+  }
+  const shown = serverNeighbors.filter(n => !n.is_me && searchMatch.has(n.author.user_id)).length;
+  const word = shortTitle(searchMatchQuery, 12);
+  note.innerHTML = `
+    <span>🔍 <b>${escapeText(word)}</b>${hasFinal(word) ? "과" : "와"} 닮은 고민을 쓴 이웃 ${shown}명만 보여요</span>
+    <button type="button" id="searchMapAll">모두 보기</button>`;
+  el("searchMapAll").onclick = () => el("reset").click();
+}
+
 function renderMarkers() {
   const mine = serverNeighbors.find(neighbor => neighbor.is_me);
-  const others = serverNeighbors.filter(neighbor => !neighbor.is_me);
-  const items = [...footprintItems(), ...bottleItem(), ...keeperItem()];
+  const others = serverNeighbors.filter(neighbor => !neighbor.is_me && (!searchMatch || searchMatch.has(neighbor.author.user_id)));
+  const items = [...bottleItem(), ...keeperItem()];
 
   // 섬 중앙 모닥불 (섬 온도)
   if (islandTemp) {
@@ -115,7 +165,7 @@ function renderMarkers() {
       html: `
         <button type="button" class="marker campfire level-${islandTemp.level}" data-campfire
           aria-label="섬 온도 ${islandTemp.temperature}도">
-          <span class="campfire-flame" aria-hidden="true">🔥</span>
+          <span class="campfire-flame" aria-hidden="true"><img src="assets/campfire/campfire-${campfireSize[islandTemp.level] || "m"}.png" alt=""></span>
           <span class="campfire-temp">🌡️ ${islandTemp.temperature}°</span>
         </button>`,
     });
@@ -148,10 +198,12 @@ function renderMarkers() {
     const similarity = resonance.get(id);
     const anchor = postSpot(neighbor);
     const away = Boolean(live || similarity);
-    const latest = neighbor.latest_post;
+    const matched = searchMatch?.get(id);
+    const latest = matched ? { id: matched.id, title: matched.title } : neighbor.latest_post;
     // 서버가 내용이 닮은 고민끼리 묶어 줌 → 대표 글 자리에만 말풍선 하나("+N"), 나머지는 그리지 않음
-    const merged = Boolean(latest?.bubble && latest.bubble !== latest.id);
-    const groupSize = latest?.bubble === latest?.id ? latest.bubble_size || 1 : 1;
+    // (검색 중에는 찾은 고민을 하나씩 보여 주므로 묶지 않음)
+    const merged = !matched && Boolean(latest?.bubble && latest.bubble !== latest.id);
+    const groupSize = !matched && latest?.bubble === latest?.id ? latest.bubble_size || 1 : 1;
     placed.add(id);
     if (merged && !away) continue;
 
@@ -184,14 +236,14 @@ function renderMarkers() {
         // 공명하는 이웃은 자기 고민을 남긴 자리에서 출발해 한 명씩 차례로 걸어옴
         from: similarity ? anchor : null,
         delay: similarity ? resonant.indexOf(id) * 0.9 : 0,
-        html: personMarker(author, { live: Boolean(live), similarity }),
+        html: personMarker(author, { live: Boolean(live), similarity, postId: resonancePosts.get(id) }),
       });
     }
   }
 
-  // 글은 없지만 지금 섬을 돌아다니는 사람
+  // 글은 없지만 지금 섬을 돌아다니는 사람 (검색 중에는 숨김)
   for (const [id, live] of onlineNeighbors) {
-    if (placed.has(id)) continue;
+    if (placed.has(id) || searchMatch) continue;
     items.push({
       key: "who-" + id,
       ...insideIsland(live),
@@ -237,10 +289,13 @@ function renderMarkers() {
   syncMarkers(items);
 }
 
-function personMarker(author, { live = false, similarity = null } = {}) {
+function personMarker(author, { live = false, similarity = null, postId = null } = {}) {
   return `
     <div class="marker author-pin person ${live ? "live" : "wander"} ${similarity ? "resonant" : ""}">
-      ${similarity ? `
+      ${similarity ? postId ? `
+        <button type="button" class="resonance-tag" data-post="${postId}"
+          title="내 고민과 비슷한 정도 ${Math.round(similarity * 100)}% · 눌러서 이 이웃의 닮은 고민 보기"
+          aria-label="${escapeText(author.nickname)}의 닮은 고민 보기">🔥 공명</button>` : `
         <span class="resonance-tag" title="내 고민과 비슷한 정도 ${Math.round(similarity * 100)}%">
           🔥 공명
         </span>` : ""}

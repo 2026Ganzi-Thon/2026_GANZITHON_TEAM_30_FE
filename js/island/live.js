@@ -1,4 +1,4 @@
-// 공명 · 실시간 접속 · 섬 온도(모닥불) · 발자국
+// 공명 · 실시간 접속 · 섬 온도(모닥불)
 // (island-core.js에서 분리. 모든 island/*.js는 전역 스코프를 공유하는 일반 스크립트라 HTML의 로드 순서가 중요합니다)
 
 // ── 기능 1. 공명: 내 최근 고민과 비슷한 고민을 쓴 이웃이 다가옴 ──
@@ -12,11 +12,14 @@ async function loadResonance() {
     }
     const onIsland = new Set(serverNeighbors.map(n => n.author.user_id));
     const next = new Map();
+    const bestPost = new Map();
     for (const item of similarCache.get(postId)) {
       const id = item.author?.user_id;
       if (!id || id === me.id || !onIsland.has(id)) continue;
+      if (item.similarity > (next.get(id) || 0)) bestPost.set(id, item.id);
       next.set(id, Math.max(next.get(id) || 0, item.similarity));
     }
+    resonancePosts = bestPost;
     // 가장 비슷한 이웃 4명까지만
     resonance = new Map(
       [...next].sort((a, b) => b[1] - a[1]).slice(0, 4),
@@ -70,43 +73,6 @@ async function loadTemperature() {
   } catch (error) {
     if (error.status === 404) islandTemp = null; // 이전 서버
   }
-}
-
-// ── 발자국: 최근 하루 동안 섬을 다녀간 이웃의 흔적. 지금 아무도 없어도 섬이 비어 보이지 않게 ──
-let footprints = [];
-let footprintVisitors = 0;
-async function loadFootprints() {
-  if (!Number.isInteger(islandId)) return;
-  try {
-    const result = await api(`/islands/${islandId}/footprints`);
-    footprints = result.footprints;
-    footprintVisitors = result.visitors;
-    updateIslandCounts();
-    renderMarkers();
-  } catch {
-    footprints = []; // 이전 서버면 조용히 넘어감
-  }
-}
-
-function footprintItems() {
-  const shown = new Set([...onlineNeighbors.keys(), ...resonance.keys()]);
-  return footprints
-    .filter((mark) => !shown.has(mark.user_id))
-    .map((mark) => {
-      const base = mark.x != null ? { x: mark.x, y: mark.y } : spotFor(mark.user_id);
-      // 글 자리와 겹치지 않게 살짝 비켜서, 걸어온 방향으로 찍음
-      const pos = insideIsland({ x: base.x - 3.5, y: base.y + 4 });
-      const fade = Math.max(0.25, 0.8 - mark.hours_ago / 30);
-      return {
-        key: "foot-" + mark.user_id,
-        ...pos,
-        html: `
-          <div class="marker footprint" style="opacity:${fade.toFixed(2)}" aria-hidden="true"
-            title="${mark.hours_ago < 1 ? "조금 전" : Math.round(mark.hours_ago) + "시간 전"}에 다녀간 이웃">
-            <i></i><i></i><i></i>
-          </div>`,
-      };
-    });
 }
 
 function showCampfireInfo() {

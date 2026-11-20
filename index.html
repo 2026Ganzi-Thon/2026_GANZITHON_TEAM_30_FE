@@ -4,7 +4,7 @@
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self' https://ondo-api.onrender.com; base-uri 'self'; form-action 'self'; object-src 'none'">
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>ON-DO</title>
-<link rel="stylesheet" href="css/style.css?v=20261119-4">
+<link rel="stylesheet" href="css/style.css?v=20261120-3">
 </head>
 <body>
 <header><nav><span class="site-brand">ON-DO</span><button id="account" class="plain" hidden>로그아웃</button></nav></header>
@@ -14,15 +14,25 @@
 <h1>회사에서는 못 했던 말, 여기서는 괜찮아요.</h1>
 <p>익명으로 고민을 나누고 해결해 보아요.</p>
 <div class="map">
-<img class="welcome-land" src="assets/welcome/welcome-map.png" alt="숲과 강이 어우러진 ON-DO 섬">
-<div class="welcome-marker" style="--x:48.4%;--y:39%" aria-hidden="true"><img src="assets/welcome/welcome-heart.png" alt=""><img src="assets/characters/0.png" alt=""></div>
-<div class="welcome-marker" style="--x:30%;--y:67%" aria-hidden="true"><img src="assets/welcome/welcome-heart.png" alt=""><img src="assets/characters/0.png" alt=""></div>
-<div class="welcome-marker" style="--x:88%;--y:72%" aria-hidden="true"><img src="assets/welcome/welcome-heart.png" alt=""><img src="assets/characters/0.png" alt=""></div>
-<button id="start">WELCOME-TO-ON-DO(클릭하기)</button>
+  <img class="welcome-land" src="assets/welcome/welcome-map.png" alt="숲과 강이 어우러진 ON-DO 섬">
+  <div class="welcome-marker" style="--x:50%;--y:41%" aria-hidden="true">
+    <span class="welcome-bubble">오늘 첫 출근인데 떨려요.</span>
+    <img class="welcome-char" src="assets/characters/0.png" alt="">
+  </div>
+  <div class="welcome-marker" style="--x:22.5%;--y:55%" aria-hidden="true">
+    <span class="welcome-bubble is-short">첫 시안 피드백이 계속 마음에 남아요.</span>
+    <img class="welcome-char" src="assets/characters/0.png" alt="">
+  </div>
+  <div class="welcome-marker" style="--x:68%;--y:82%" aria-hidden="true">
+    <span class="welcome-bubble">팀장님한테 꾸증을 들었어요...</span>
+    <img class="welcome-char" src="assets/characters/0.png" alt="">
+  </div>
+  <button id="start" aria-label="ON-DO 시작하기">WELCOME TO ON-DO</button>
 </div>
 <p id="wakeStatus" class="wake-status" aria-live="polite" hidden>서버를 깨우는 중이에요…</p>
 </section>
 <section id="choose" hidden>
+<button type="button" id="editCancel" class="edit-cancel" hidden>‹ 섬으로 돌아가기</button>
 <h1>ON-DO에서 어떤 캐릭터로 활동해볼까요?</h1>
 <p>캐릭터와 닉네임으로 서로 소통해요.</p>
 <div class="stage">
@@ -33,7 +43,11 @@
 <button type="button" class="arrow next" id="next" aria-label="다음 캐릭터">›</button>
 </div>
 <strong id="animalName" class="animal-name" aria-live="polite"></strong>
-<p id="animalPersona" class="animal-persona"></p>
+<p id="animalPersona" class="animal-persona" hidden></p>
+<div class="color-palette">
+<div id="paletteOptions" class="palette-options" role="group" aria-label="캐릭터 색감" hidden></div>
+</div>
+<p class="wheel-hint">마우스 휠이나 ‹ › 로 넘겨 보세요</p>
 </div>
 <form id="profile" class="nickname">
 <label for="nick" class="visually-hidden">익명 닉네임</label>
@@ -139,6 +153,6 @@
 </div>
 </dialog>
 <script src="js/api.js?v=20261119-4"></script>
-<script src="js/app.js?v=20261119-6"></script>
+<script src="js/app.js?v=20261119-10"></script>
 </body>
 </html>

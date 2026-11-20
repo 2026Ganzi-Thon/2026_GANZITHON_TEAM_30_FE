@@ -8,6 +8,7 @@ const adjectives = [
 ];
 const nicknameHistory = new Map();
 let animal = 2, verified = false, draft = {};
+let pickedColor = 'original'; // 팔레트에서 고른 캐릭터 색감 (BE CHARACTER_COLORS 키)
 let saved = loadProfile();
 // 'login' = 이메일로 시작하기 화면, 'signup' = 처음 온 사람의 직무·동의 화면 (이메일 인증은 이미 끝난 상태)
 function showAuth(mode) {
@@ -57,51 +58,53 @@ async function recommend() {
   }
 }
 
-const jobIcons = {
-  '디자인': 'design',
-  '개발': 'development',
-  '마케팅': 'marketing',
-  '영업': 'marketing'
-};
 function select(index, refreshNick = true) {
   animal = (index + names.length) % names.length;
-  const icon = jobIcons[draft.job];
   const cards = byId('cards');
+  const paletteWasOpen = !byId('paletteOptions').hidden;
   cards.replaceChildren();
   for (const offset of [-1, 0, 1]) {
     const choice = (animal + offset + names.length) % names.length;
-    const card = document.createElement('button');
-    card.type = 'button';
-    card.className = 'character-card';
-    card.setAttribute('aria-label', names[choice]);
-    card.setAttribute('aria-pressed', offset === 0);
-    const iconSlot = document.createElement('span');
-    iconSlot.className = 'job-icon';
-    if (icon) {
-      const badge = new Image();
-      badge.src = 'assets/jobs/' + icon + '.png';
-      badge.alt = draft.job;
-      iconSlot.append(badge);
+    // 가운데(고른) 카드는 안에 '색감 고르기' 버튼이 들어가야 해서 button 대신 div (버튼 안에 버튼은 안 됨)
+    const card = document.createElement(offset ? 'button' : 'div');
+    card.className = 'character-card' + (offset ? '' : ' is-current');
+    if (offset) {
+      card.type = 'button';
+      card.setAttribute('aria-label', names[choice] + ' 고르기');
+      card.setAttribute('aria-pressed', 'false');
+    } else {
+      card.setAttribute('role', 'group');
+      card.setAttribute('aria-label', '고른 캐릭터 ' + names[choice]);
+      card.tabIndex = -1;
+    }
+    // 위쪽 아이콘: 직무 아이콘(노트북 등) 대신 팔레트 (피그마). 가운데 카드만 눌러서 색감을 고를 수 있음
+    const iconSlot = document.createElement(offset ? 'span' : 'button');
+    iconSlot.className = 'palette-badge';
+    iconSlot.innerHTML = '<img src="assets/palette.svg" alt="">' + (offset ? '' : '<span>색감 고르기</span>');
+    if (!offset) {
+      iconSlot.type = 'button';
+      iconSlot.id = 'paletteToggle';
+      iconSlot.setAttribute('aria-controls', 'paletteOptions');
+      iconSlot.setAttribute('aria-expanded', String(paletteWasOpen));
+      iconSlot.onclick = togglePalette;
     }
     const animalImage = new Image();
-    animalImage.className = 'character-image';
+    animalImage.className = ['character-image', toneClass(pickedColor)].filter(Boolean).join(' ');
     animalImage.src = 'assets/characters/' + choice + '.png';
     animalImage.alt = '';
     const base = document.createElement('span');
     base.className = 'character-base';
     card.append(iconSlot, base, animalImage);
-    card.onclick = () => {
-      if (offset) select(choice);
+    if (offset) card.onclick = () => {
+      select(choice);
       cards.children[1].focus();
     };
     cards.append(card);
   }
   byId('animalName').textContent = names[animal];
-  // 12간지 × 위로 성향: 이 캐릭터로 댓글을 달면 붙는 칭호
-  const persona = personaOf(CHARACTER_KEYS[animal]);
-  byId('animalPersona').textContent = persona
-    ? `${persona.icon} ${persona.label} · 댓글에 이 칭호가 함께 보여요`
-    : '';
+  // 칭호(12간지 × 위로 성향) 안내는 기획 확정 전이라 아직 숨김
+  byId('animalPersona').hidden = true;
+  renderPalette();
   if (refreshNick) recommend();
 }
 byId('previous').onclick = () => select(animal - 1);
@@ -113,6 +116,40 @@ byId('animals').onkeydown = event => {
   select(animal + offset);
   byId('cards').children[1].focus();
 };
+// 마우스 휠(트랙패드 가로 스크롤 포함)로도 넘기기. 한 번 굴릴 때 한 칸만 넘어가게 잠깐 쉬었다가 받음
+let wheelLock = 0;
+byId('animals').addEventListener('wheel', event => {
+  const delta = Math.abs(event.deltaX) > Math.abs(event.deltaY) ? event.deltaX : event.deltaY;
+  if (Math.abs(delta) < 4) return;
+  event.preventDefault(); // 고르는 동안 화면이 위아래로 스크롤되지 않게
+  const now = Date.now();
+  if (now < wheelLock) return;
+  wheelLock = now + 280;
+  select(animal + (delta > 0 ? 1 : -1), true);
+}, {passive:false});
+
+// 팔레트: 누르면 색감 8가지가 펼쳐지고, 고르면 캐릭터 색이 바로 바뀜 (가입·수정 때 함께 저장)
+function renderPalette() {
+  const box = byId('paletteOptions');
+  if (!box) return;
+  box.innerHTML = CHARACTER_COLORS.map(([key, label]) => `
+    <button type="button" data-color="${key}" aria-pressed="${key === pickedColor}" title="${label}">
+      <img class="${toneClass(key)}" src="assets/characters/${animal}.png" alt="">
+      <span>${label}</span>
+    </button>`).join('');
+}
+function togglePalette() {
+  const box = byId('paletteOptions');
+  box.hidden = !box.hidden;
+  byId('paletteToggle').setAttribute('aria-expanded', String(!box.hidden));
+}
+byId('paletteOptions').onclick = event => {
+  const button = event.target.closest('[data-color]');
+  if (!button) return;
+  pickedColor = button.dataset.color;
+  select(animal, false);
+};
+
 let swipeStart;
 byId('cards').addEventListener('touchstart', event => {
   swipeStart = event.changedTouches[0].clientX;
@@ -534,17 +571,16 @@ byId('onboard').onsubmit = event => {
   };
 
   byId('info').close();
+  pickedColor = 'original';
   select(2);
   show('choose');
 };
 
 
+// 이미 로그인한 사람: '환영해요' 화면 없이 바로 섬 선택으로 (캐릭터 수정은 섬 프로필 메뉴에 있음)
 function welcome() {
-  byId('doneAnimal').src = 'assets/characters/' + saved.animal + '.png';
-  byId('greeting').textContent = saved.nick + '님, ON-DO에 오신 걸 환영해요!';
-  byId('details').textContent = [saved.job, saved.years].filter(Boolean).join(' · ');
   sessionStorage.setItem('ondo-session', '1');
-  show('done');
+  location.replace('island-select.html');
 }
 byId('shuffle').onclick = recommend;
 byId('nick').oninput = () => byId('nick').setCustomValidity('');
@@ -563,11 +599,14 @@ byId('profile').onsubmit = async event => {
     try {
       const updated = await api('/users/me', {
         method: 'PATCH',
-        body: { character: CHARACTER_KEYS[animal], nickname }
+        body: { character: CHARACTER_KEYS[animal], nickname, color: pickedColor }
       });
-      saved = { ...saved, nick: updated.nickname, animal: CHARACTER_KEYS.indexOf(updated.character) };
+      saved = { ...saved, nick: updated.nickname, animal: CHARACTER_KEYS.indexOf(updated.character), color: updated.color || pickedColor };
       saveProfile(saved);
-      welcome();
+      const back = editReturnUrl();
+      sessionStorage.removeItem(EDIT_RETURN_KEY);
+      if (back) location.href = back; // 섬에서 왔으면 그 섬으로 바로 돌아감
+      else welcome();
     } catch (error) {
       alert(error.message);
     } finally {
@@ -592,7 +631,8 @@ byId('profile').onsubmit = async event => {
         character: CHARACTER_KEYS[animal],
         nickname,
         agree_privacy: draft.agree_privacy,
-        remember: Boolean(draft.remember)
+        remember: Boolean(draft.remember),
+        color: pickedColor
       }
     });
 
@@ -615,11 +655,25 @@ byId('profile').onsubmit = async event => {
     submit.textContent = '입력 완료';
   }
 };
-byId('edit').onclick = () => {
+// 섬에서 '캐릭터 수정'으로 들어오면 돌아갈 섬 주소가 남아 있음. 다른 사이트로 튀지 않게 같은 폴더의 .html만 허용
+const EDIT_RETURN_KEY = 'ondo-edit-return';
+function editReturnUrl() {
+  const back = sessionStorage.getItem(EDIT_RETURN_KEY) || '';
+  return /^[\w-]+\.html(\?[\w=&%-]*)?$/.test(back) ? back : '';
+}
+function startEdit() {
   draft = {email:saved.email, job:saved.job, years:saved.years};
+  pickedColor = saved.color || 'original';
   select(saved.animal, false);
   byId('nick').value = saved.nick;
+  byId('editCancel').hidden = !editReturnUrl();
   show('choose');
+}
+byId('edit').onclick = startEdit;
+byId('editCancel').onclick = () => {
+  const back = editReturnUrl();
+  sessionStorage.removeItem(EDIT_RETURN_KEY);
+  location.href = back || 'island-select.html';
 };
 byId('account').onclick = logout;
 
@@ -650,4 +704,7 @@ byId('demoLogin').onclick = async () => {
     });
 })();
 
-if (saved && authToken()) welcome();
+if (saved && authToken()) {
+  if (location.hash === '#edit-character') startEdit();
+  else welcome();
+}

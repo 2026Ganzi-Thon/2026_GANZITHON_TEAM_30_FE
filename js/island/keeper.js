@@ -15,7 +15,7 @@ function hasFinal(word) {
 const copula = (word) => (hasFinal(word) ? "이에요" : "예요");
 const topicMark = (word) => (hasFinal(word) ? "은" : "는");
 
-const keeperSvg = (size = 56) => `
+const keeperSvg = (size = 70) => `
   <svg class="keeper-art" width="${size}" height="${size}" viewBox="0 0 64 64" aria-hidden="true">
     <ellipse cx="32" cy="59" rx="15" ry="3.5" fill="#00000022"/>
     <path d="M18 56c0-12 6-20 14-20s14 8 14 20z" fill="#2f6f8f"/>
@@ -125,7 +125,6 @@ async function openKeeper() {
           ${stat(w.posts, "나눈 고민")}
           ${stat(w.comforts, "이웃의 위로")}
           ${stat(w.ai_comforts, "온도의 위로")}
-          ${stat(w.thanks, "받은 고마움")}
           ${stat(w.visitors, "다녀간 이웃")}
         </div>
         ${w.top_topic ? `<p class="keeper-note">이번 주에 가장 많이 나눈 고민은 <b>${escapeText(w.top_topic)}</b>${copula(w.top_topic)}.</p>` : ""}

@@ -1,6 +1,7 @@
 // 시간대별 배경 테마
 // (island-core.js에서 분리. 모든 island/*.js는 전역 스코프를 공유하는 일반 스크립트라 HTML의 로드 순서가 중요합니다)
 
+
 function toast(message) {
   el("notice").textContent = message;
   el("notice").hidden = false;

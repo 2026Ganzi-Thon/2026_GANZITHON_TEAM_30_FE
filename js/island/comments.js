@@ -29,7 +29,6 @@ function renderComment(comment, post, child = false) {
     : img(CHARACTER_KEYS.indexOf(comment.author?.character));
   const canReport = !comment.is_mine && !comment.is_ai;
   const canDelete = comment.is_mine && !comment.is_ai;
-  const canThank = post.is_mine && !comment.is_ai && !comment.is_mine;
   const canReply = post.visibility === "public";
 
   return `
@@ -38,11 +37,10 @@ function renderComment(comment, post, child = false) {
         <img class="reply-avatar ${comment.is_ai ? "" : toneClass(comment.author?.color)}" src="${avatar}" alt="">
         <strong>${escapeText(commentName(comment))}</strong>
         ${comment.is_mine && !comment.is_ai ? `<span class="me-tag">나</span>` : ""}
-        ${comment.is_ai ? "" : titleBadge(comment.author?.title) + personaChip(comment.author?.character)}
+        ${comment.is_ai ? "" : titleBadge(comment.author?.title)}
       </div>
       <p>${escapeText(comment.content)}</p>
       <div class="reply-actions">
-        ${canThank ? `<button type="button" class="link-btn thank-btn" data-thank-comment="${comment.id}" aria-pressed="${comment.thanked}">${comment.thanked ? "♥ 고마워요" : "♡ 고마워요"}</button>` : ""}
         ${canReply ? `<button type="button" class="link-btn" data-reply-to="${comment.id}">답글</button>` : ""}
         ${canReport ? `<button type="button" class="link-btn quiet" data-report-comment="${comment.id}">신고</button>` : ""}
         ${canDelete ? `<button type="button" class="link-btn quiet" data-delete-comment="${comment.id}">삭제</button>` : ""}

@@ -1,4 +1,4 @@
-// 마이페이지: 내 글/댓글 · 차단 목록 · 프로필 · 칭호 도감 · 설정
+// 마이페이지: 내 글/댓글 · 차단 목록 · 프로필 · 칭호 도감 · 설정 · 탈퇴
 // (island-core.js에서 분리. 모든 island/*.js는 전역 스코프를 공유하는 일반 스크립트라 HTML의 로드 순서가 중요합니다)
 
 async function loadMyPosts(selectedTab) {
@@ -18,19 +18,10 @@ async function loadMyPosts(selectedTab) {
       tab !== selectedTab
     ) return;
 
-    container.innerHTML = posts.map(post => `
-      <article>
-        <button class="soft" data-post="${post.id}">
-          ${post.has_unread ? "● " : ""}${escapeText(post.title)}
-        </button>
-        <small>
-          ${escapeText(post.topic)} · 답글 ${post.comment_count}
-        </small>
-        <small>
-          ${escapeText(new Date(post.created_at).toLocaleString("ko-KR"))}
-        </small>
-      </article>
-    `).join("") || "<p>작성한 고민이 없어요.</p>";
+    container.innerHTML = posts.map(post => worryCard({
+      ...post,
+      author: { nickname: me.nick },
+    }, { unread: post.has_unread })).join("") || "<p>작성한 고민이 없어요.</p>";
   } catch (error) {
     if (el("myServerPosts") === container) {
       container.textContent = error.message;
@@ -116,25 +107,11 @@ async function loadMyComments() {
     if (el("myServerComments") !== container) return;
 
     container.innerHTML = comments.map(comment => `
-      <article class="reply">
-        <button
-          type="button"
-          class="soft"
-          ${comment.post_id === null
-            ? "disabled"
-            : `data-post="${comment.post_id}"`}
-        >
-          ${comment.post_id === null
-            ? "현재 볼 수 없는 글"
-            : escapeText(comment.post_title)}
-        </button>
-        <p>${escapeText(comment.content)}</p>
-        <small>
-          ${escapeText(
-            new Date(comment.created_at).toLocaleString("ko-KR")
-          )}
-        </small>
-      </article>
+      <button type="button" class="card comment-card" ${comment.post_id === null ? "disabled" : `data-post="${comment.post_id}"`}>
+        <small class="mode">${escapeText(new Date(comment.created_at).toLocaleString("ko-KR"))}</small>
+        <strong>${comment.post_id === null ? "현재 볼 수 없는 글" : escapeText(comment.post_title)}</strong>
+        <small class="comment-preview">${escapeText(comment.content)}</small>
+      </button>
     `).join("") || "<p>아직 작성한 댓글이 없어요.</p>";
   } catch (error) {
     if (el("myServerComments") === container) {
@@ -158,16 +135,15 @@ function personal(detail = null) {
   const tabs = [
     ["alerts", unread ? "댓글 알림 " + unread : "댓글 알림"],
     ["private", "나만보기"],
-    ["own", "내 고민"],
-    ["comments", "내 댓글"],
+    ["own", "내 고민글"],
+    ["comments", "작성한 댓글"],
     ["titles", "칭호 도감"],
-    ["settings", "캐릭터 설정"],
   ];
   const heading = detail
     ? "댓글 상세"
     : tab === "alerts"
       ? "댓글 알림"
-      : tabs.find(([id]) => id === tab)[1];
+      : (tabs.find(([id]) => id === tab) || tabs[0])[1];
   section.hidden = false;
   el("profile").setAttribute("aria-expanded", "true");
   requestAnimationFrame(fitPersonal);
@@ -180,12 +156,6 @@ function personal(detail = null) {
   content = '<div id="myServerComments">내 댓글을 불러오는 중...</div>';
   } else if (tab === "titles") {
     content = '<div id="titleBook" class="title-book">칭호를 불러오는 중...</div>';
-  } else if (tab === "settings") {
-    content = `<form id="profileSettings" class="profile-settings">
-      <label for="profileNick">닉네임</label><input id="profileNick" maxlength="18" required value="${escapeText(me.nick)}">
-      <p class="my-persona">내 성격 ${personaChip(CHARACTER_KEYS[me.animal])} <small>활동 칭호는 "칭호 도감"에서 볼 수 있어요</small></p>
-      <strong>캐릭터</strong><div class="profile-character-grid">${characterNames.map((name, index) => `<button type="button" data-profile-animal="${index}" aria-label="${name} · ${personaOf(CHARACTER_KEYS[index])?.label || ""}" title="${personaOf(CHARACTER_KEYS[index])?.label || ""}" aria-pressed="${index === me.animal}"><img class="${toneClass(me.color)}" src="${img(index)}" alt=""><span>${personaOf(CHARACTER_KEYS[index])?.icon || ""} ${name}</span></button>`).join("")}</div>
-      <button class="wide">변경사항 저장</button></form>`;
   } else {
     content = '<div id="myServerPosts">내 고민을 불러오는 중...</div>';
   }
@@ -194,7 +164,6 @@ function personal(detail = null) {
     ${detail ? "" : '<div class="row personal-tabs">' + tabs.map(([id, label]) => `<button data-tab="${id}" ${id === tab ? "" : 'class="soft"'} aria-pressed="${id === tab}">${label}</button>`).join("") + "</div>"}${content}`;
   if (!detail) loadMySummary();
   if (!detail && tab === "titles") loadTitleBook();
-  if (!detail && tab === "settings") setupProfileSettings(section);
   if (!detail && (tab === "own" || tab === "private")) {
     loadMyPosts(tab);
   }
@@ -203,7 +172,7 @@ function personal(detail = null) {
 }
   const logoutButton = document.createElement("button");
 logoutButton.type = "button";
-logoutButton.className = "soft";
+logoutButton.className = "soft logout-btn";
 logoutButton.textContent = "로그아웃";
 
 logoutButton.onclick = () => {
@@ -213,12 +182,50 @@ logoutButton.onclick = () => {
 
 const blocksButton = document.createElement("button");
 blocksButton.type = "button";
-blocksButton.className = "soft";
+blocksButton.className = "link-btn quiet";
 blocksButton.textContent = "차단한 이용자";
 blocksButton.onclick = showBlockedUsers;
 
-section.append(blocksButton);
-section.append(logoutButton);
+const characterButton = document.createElement("button");
+characterButton.type = "button";
+characterButton.className = "link-btn quiet";
+characterButton.textContent = "캐릭터 수정";
+// 가입할 때 쓰던 캐릭터 고르기 화면으로 보냄. 저장하면 지금 보던 섬으로 돌아오게 주소를 기억해 둠
+characterButton.onclick = () => {
+  sessionStorage.setItem("ondo-edit-return", location.pathname.split("/").pop() + location.search);
+  location.href = "index.html#edit-character";
+};
+
+// 탈퇴: 서버(DELETE /auth/me)가 이메일·닉네임을 지우고 나만보기 글·공감·알림·차단을 삭제.
+// 공개 글과 댓글은 대화 흐름이 끊기지 않게 "떠난 이용자"로 남는다
+const withdrawButton = document.createElement("button");
+withdrawButton.type = "button";
+withdrawButton.className = "link-btn quiet withdraw-btn";
+withdrawButton.textContent = "탈퇴하기";
+withdrawButton.onclick = async () => {
+  const ok = confirm(
+    "정말 탈퇴할까요?\n\n· 이메일·닉네임이 지워지고 되돌릴 수 없어요.\n· 나만보기 고민과 알림은 삭제돼요.\n· 공개 고민과 댓글은 '떠난 이용자'로 남아요.",
+  );
+  if (!ok) return;
+  withdrawButton.disabled = true;
+  try {
+    await api("/auth/me", { method: "DELETE" });
+    clearAuth();
+    alert("탈퇴했어요. 그동안 함께해 주셔서 고마워요.");
+    location.replace("index.html");
+  } catch (error) {
+    withdrawButton.disabled = false;
+    toast(error.message);
+  }
+};
+
+// 아래 줄: 왼쪽에 작은 글자 링크(캐릭터 수정 · 차단한 이용자 · 탈퇴하기), 오른쪽 끝에 로그아웃
+const foot = document.createElement("div");
+foot.className = "personal-foot";
+const links = document.createElement("span");
+links.append(characterButton, blocksButton, withdrawButton);
+foot.append(links, logoutButton);
+section.append(foot);
 if (!detail && tab === "comments") {
   loadMyComments();
 }
@@ -231,7 +238,8 @@ async function loadMySummary() {
   try {
     const s = await api("/users/me/summary");
     if (el("mySummary") !== box) return;
-    box.textContent = `쓴 글 ${s.post_count}개 · 쓴 댓글 ${s.comment_count}개 · 위로한 고민 ${s.posts_helped}개 · 받은 고마움 ${s.thanks_received}번`;
+    box.textContent = `작성한 글 ${s.post_count}개 · 건넨 위로 ${s.comment_count}번`;
+    box.title = "건넨 위로: 이웃의 고민에 남긴 댓글 수";
   } catch (error) {
     if (el("mySummary") === box) box.textContent = "활동 요약을 불러오지 못했어요.";
   }
@@ -256,7 +264,7 @@ async function loadTitleBook(data = null) {
                 data-title-key="${escapeText(t.key)}" ${t.earned ? "" : "disabled"}
                 aria-pressed="${book.current?.key === t.key}"
                 aria-label="${escapeText(t.name)}${t.earned ? " (얻음, 누르면 대표 칭호로)" : ` (${t.progress}/${t.need})`}">
-                <span class="title-icon">${t.earned ? escapeText(t.icon) : "🔒"}</span>
+                <span class="title-icon has-img" aria-hidden="true">${titleIcon(t, "title-icon-img")}</span>
                 <strong>${escapeText(t.name)}</strong>
                 <small>${escapeText(t.desc)}</small>
                 ${t.earned
@@ -477,9 +485,7 @@ function setupProfileSettings(section) {
         loadNeighbors()
       ]);
 
-      if (section.isConnected && tab === "settings") {
-        personal();
-      }
+      if (section.open) section.close();
 
       toast("캐릭터와 닉네임을 변경했어요.");
     } catch (error) {
@@ -491,6 +497,29 @@ function setupProfileSettings(section) {
       submit.textContent = "변경사항 저장";
     }
   };
+}
+
+// 캐릭터 수정은 좁은 프로필 패널 대신 큰 창에서. 기존 설정 폼(setupProfileSettings)을 그대로 씀
+function openCharacterSettings() {
+  let dialog = el("characterDialog");
+  if (!dialog) {
+    dialog = document.createElement("dialog");
+    dialog.id = "characterDialog";
+    dialog.className = "paper character-dialog";
+    dialog.setAttribute("aria-labelledby", "characterDialogTitle");
+    document.body.append(dialog);
+    dialog.addEventListener("click", (event) => {
+      if (event.target === dialog || event.target.closest("[data-close-character]")) dialog.close();
+    });
+  }
+  dialog.innerHTML = `<div class="between"><h2 id="characterDialogTitle">캐릭터 수정</h2><button type="button" class="soft" data-close-character>닫기</button></div>
+    <form id="profileSettings" class="profile-settings">
+      <label for="profileNick">닉네임</label><input id="profileNick" maxlength="18" required value="${escapeText(me.nick)}">
+      <strong>캐릭터</strong><div class="profile-character-grid">${characterNames.map((name, index) => `<button type="button" data-profile-animal="${index}" aria-label="${name}" aria-pressed="${index === me.animal}"><img class="${toneClass(me.color)}" src="${img(index)}" alt=""><span>${name}</span></button>`).join("")}</div>
+      <button class="wide">변경사항 저장</button></form>`;
+  setupProfileSettings(dialog);
+  closeProfile();
+  dialog.showModal();
 }
 
 function closeProfile() {

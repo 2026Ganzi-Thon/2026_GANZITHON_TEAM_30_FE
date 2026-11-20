@@ -55,15 +55,17 @@ async function loadNotifications() {
     el("badge").textContent = serverUnreadCount;
     el("badge").hidden = serverUnreadCount === 0;
 
-    container.innerHTML = result.notifications.map(notification => {
+    // 안 읽은 알림을 맨 위로 (같은 묶음 안에서는 원래 순서인 최신순 유지)
+    const sortedNotifications = [...result.notifications].sort((a, b) => Number(a.is_read) - Number(b.is_read));
+    container.innerHTML = sortedNotifications.map(notification => {
       const { text, name } = notificationText(notification);
       return `
       <button
-        class="alert-row"
+        class="alert-row ${notification.is_read ? "is-read" : "is-unread"}"
         data-notification-post="${notification.post_id}"
       >
         <span>
-          <strong>${notification.is_read ? "" : "● "}${escapeText(notification.post_title)}</strong>
+          <strong>${notification.is_read ? "" : `<em class="alert-new">새 알림</em>`}${escapeText(notification.post_title)}</strong>
           <small>
             ${escapeText(text)}${name ? ` · ${escapeText(name)}` : ""}
           </small>

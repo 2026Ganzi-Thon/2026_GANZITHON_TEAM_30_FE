@@ -7,12 +7,14 @@ function updateTopicSelection() {
     : "세부 주제를 선택해 주세요.";
   el("topicSelection").classList.toggle("needs-topic", false);
   for (const category of el("categories").querySelectorAll(".category")) {
-    category.classList.toggle(
-      "selected",
-      Array.from(category.querySelectorAll("[data-category-topic]")).some(
-        (button) => button.dataset.categoryTopic === selectedTopic,
-      ),
+    const picked = Array.from(category.querySelectorAll("[data-category-topic]")).some(
+      (button) => button.dataset.categoryTopic === selectedTopic,
     );
+    category.classList.toggle("selected", picked);
+    // 고른 세부 주제가 이 분류 안에 있으면 분류 이름 대신 세부 주제를 보여 줌 (다시 열면 다른 세부 주제로 바꿀 수 있음)
+    const summary = category.querySelector("summary");
+    summary.textContent = picked ? selectedTopic : summary.dataset.group;
+    summary.title = picked ? `${summary.dataset.group} · ${selectedTopic}` : "";
   }
   for (const button of el("categories").querySelectorAll(
     "[data-category-topic]",
@@ -28,7 +30,7 @@ function setupCategories() {
   list.innerHTML = Object.entries(topics)
     .map(
       ([group, items]) =>
-        `<details class="category" name="worry-category"><summary>${group}</summary><div class="topic-options">
+        `<details class="category" name="worry-category"><summary data-group="${group}">${group}</summary><div class="topic-options">
       ${items.map((topic) => `<button type="button" data-category-topic="${topic}" aria-pressed="false">${topic}</button>`).join("")}
     </div></details>`,
     )

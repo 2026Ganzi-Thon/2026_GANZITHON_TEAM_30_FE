@@ -13,20 +13,25 @@ const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 // 상담 안내(글·댓글 작성 응답의 crisis_support) 표시
 function showCrisisSupport(support) {
   if (!support) return;
-  alert(
-    [
-      support.message,
-      ...(support.resources || []).map((resource) =>
-        typeof resource === "string"
-          ? resource
-          : [resource.name, resource.phone, resource.hours]
-              .filter(Boolean)
-              .join(" · "),
-      ),
-    ]
-      .filter(Boolean)
-      .join("\n\n"),
+  const resources = (support.resources || []).map((r) =>
+    typeof r === "string"
+      ? `<span class="keeper-call">${escapeText(r)}</span>`
+      : `<a class="keeper-call" href="tel:${escapeText(r.phone)}">${escapeText(r.name)} <b>${escapeText(r.phone)}</b> <small>${escapeText(r.hours || "")}</small></a>`,
   );
+  // alert 대신 접고 펼치는 카드 (처음엔 접힌 상태, 눌러야 상담 전화가 보임)
+  document.getElementById("crisisSupport")?.remove();
+  const box = document.createElement("aside");
+  box.id = "crisisSupport";
+  box.className = "crisis-support keeper-crisis";
+  box.setAttribute("role", "status");
+  box.innerHTML = `
+    <details>
+      <summary>${escapeText(support.message || "많이 힘들 땐 상담 전화가 있어요.")} <small>상담 전화 보기</small></summary>
+      <div class="row">${resources.join("")}</div>
+    </details>
+    <button type="button" class="crisis-close" aria-label="상담 안내 닫기">×</button>`;
+  box.querySelector(".crisis-close").addEventListener("click", () => box.remove());
+  document.body.append(box);
 }
 
 // 상세 하단 "비슷한 고민을 먼저 겪은 이웃들" 카드
@@ -119,21 +124,7 @@ async function showPost(id, open = true) {
     el("detailBody").innerHTML = `
       <div class="between detail-head detail-topbar">
         <strong class="detail-crumb">고민 읽기</strong>
-        <div class="row detail-tools">
-          <details class="more-menu">
-            <summary aria-label="더 보기 (${post.is_mine ? "수정·삭제" : "신고·차단"})" title="더 보기">⋯</summary>
-            <div class="more-list">
-              ${post.is_mine ? `
-                <button type="button" id="editServerPost">고민 수정</button>
-                <button type="button" class="danger-text" id="deleteServerPost">고민 삭제</button>
-              ` : `
-                <button type="button" id="reportServerPost">이 글 신고</button>
-                ${author?.user_id ? `<button type="button" id="blockPostAuthor">작성자 차단</button>` : ""}
-              `}
-            </div>
-          </details>
-          <button data-close="detail" class="soft">닫기</button>
-        </div>
+        <button data-close="detail" class="soft detail-close">닫기</button>
       </div>
 
 
@@ -149,9 +140,17 @@ async function showPost(id, open = true) {
       <article class="post-main" aria-label="작성자의 고민">
         <div class="row post-author">
           <img class="detail-avatar ${toneClass(author?.color)}" src="${img(animal)}" alt="">
-          <strong>${escapeText(nickname)}${post.is_mine ? ` <span class="me-tag">나</span>` : ""}</strong>
-          <small>${escapeText([author?.job, post.years].filter(Boolean).join(" · "))}</small>
-          <span class="badge-row">${titleBadge(author?.title)}${personaChip(author?.character)}</span>
+          <!-- 첫 줄: 닉네임 + 칭호 / 둘째 줄: 직무 · 연차 -->
+          <div class="author-text">
+            <span class="author-line">
+              <strong>${escapeText(nickname)}${post.is_mine ? ` <span class="me-tag">나</span>` : ""}</strong>
+              <span class="badge-row">${titleBadge(author?.title)}</span>
+            </span>
+            ${author?.job || post.years ? `<span class="author-sub">
+              ${author?.job ? `<span class="job-chip">${escapeText(author.job)}</span>` : ""}
+              ${post.years ? `<small>${escapeText(post.years)}</small>` : ""}
+            </span>` : ""}
+          </div>
         </div>
         <h2 class="detail-title">${escapeText(post.title)}</h2>
         <p class="post-text">${escapeText(post.content)}</p>
@@ -160,14 +159,23 @@ async function showPost(id, open = true) {
             <span class="topic-chip">${escapeText(post.topic)}</span>
             ${post.visibility === "private" ? "나만보기" : escapeText(ways[way] || "")}
           </small>
-          <button
-            type="button"
-            class="soft reaction-btn"
-            id="reactionButton"
-            aria-pressed="${post.reacted_by_me}"
-          >
-            ${post.reacted_by_me ? "♥" : "♡"} 공감 ${post.reaction_count}
-          </button>
+          <span class="row post-foot-actions">
+            ${post.visibility === "private" ? "" : `<button
+              type="button"
+              class="soft reaction-btn"
+              id="reactionButton"
+              aria-pressed="${post.reacted_by_me}"
+            >
+              ${post.reacted_by_me ? "♥" : "♡"} 공감 ${post.reaction_count}
+            </button>`}
+            ${post.is_mine ? `
+              <button type="button" class="link-btn quiet" id="editServerPost">수정</button>
+              <button type="button" class="link-btn quiet" id="deleteServerPost">삭제</button>
+            ` : `
+              <button type="button" class="link-btn quiet" id="reportServerPost">신고</button>
+              ${author?.user_id ? `<button type="button" class="link-btn quiet" id="blockPostAuthor">차단</button>` : ""}
+            `}
+          </span>
         </div>
       </article>
 
@@ -211,11 +219,8 @@ async function showPost(id, open = true) {
         ` : ""}
       </section>`}
       </div>
-
-      <section id="similarPosts" class="similar-posts browse-zone" aria-label="둘러보기"></section>
     `;
 
-    renderSimilar(post.id);
     if (post.is_mine && post.visibility === "private") setupPrivateChat(post.id);
 
     const body = el("detailBody");
@@ -243,24 +248,6 @@ async function showPost(id, open = true) {
       };
     });
 
-    body.querySelectorAll("[data-thank-comment]").forEach(button => {
-      button.onclick = async () => {
-        button.disabled = true;
-        try {
-          const result = await api(
-            `/posts/${post.id}/comments/${button.dataset.thankComment}/thanks`,
-            { method: "POST" }
-          );
-          button.setAttribute("aria-pressed", String(result.thanked));
-          button.textContent = result.thanked ? "♥ 고마워요" : "♡ 고마워요";
-        } catch (error) {
-          alert(error.message);
-        } finally {
-          button.disabled = false;
-        }
-      };
-    });
-
     body.querySelectorAll("[data-report-comment]").forEach(button => {
       button.onclick = () =>
         report("comment", Number(button.dataset.reportComment), button);
@@ -275,7 +262,7 @@ async function showPost(id, open = true) {
       el("appealPost").onclick = () => appeal("post", post.id, el("appealPost"));
     }
 
-    el("reactionButton").onclick = async () => {
+    if (el("reactionButton")) el("reactionButton").onclick = async () => {
       const button = el("reactionButton");
       if (button.disabled) return;
 
